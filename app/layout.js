@@ -1,5 +1,8 @@
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { SidebarProvider } from '@/components/ui/sidebar'
+import { AppSidebar } from '@/components/app-sidebar' // Import AppSidebar, not Sidebar
+import { SidebarInset } from '@/components/ui/sidebar' // Optional: if you want content beside sidebar
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -11,7 +14,14 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <SidebarProvider>
+          <AppSidebar /> {/* Use AppSidebar here */}
+          <SidebarInset> {/* Wrap your main content with SidebarInset */}
+            {children}
+          </SidebarInset>
+        </SidebarProvider>
+      </body>
     </html>
   )
 }
