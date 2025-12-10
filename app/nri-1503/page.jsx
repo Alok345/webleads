@@ -58,7 +58,7 @@ export default function NRI1502() {
 
   // Fetch leads from Firestore
   useEffect(() => {
-    const q = query(collection(db, "nri-1501"), orderBy("submittedAt", "desc"));
+    const q = query(collection(db, "nri-1503"), orderBy("submittedAt", "desc"));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const leadsData = [];
@@ -159,7 +159,7 @@ export default function NRI1502() {
   const handlePushLead = async (leadId) => {
     try {
       setPushingLeadId(leadId);
-      const leadRef = doc(db, "nri-1501", leadId);
+      const leadRef = doc(db, "nri-1503", leadId);
       
       // Check current status
       const leadDoc = await getDoc(leadRef);
@@ -213,7 +213,7 @@ export default function NRI1502() {
     });
     const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
 
-    const filename = `NRI-1501-Leads-${new Date().toISOString().split("T")[0]}.xlsx`;
+    const filename = `NRI-1503-Leads-${new Date().toISOString().split("T")[0]}.xlsx`;
     saveAs(blob, filename);
   };
 
@@ -324,33 +324,34 @@ export default function NRI1502() {
   }
 
   return (
+
     <SidebarProvider>
-                      <AppSidebar />
-                      <SidebarInset>
-                        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-                          <SidebarTrigger className="-ml-1" />
-                          <Separator orientation="vertical" className="mr-2 h-4" />
-                          <Breadcrumb>
-                            <BreadcrumbList>
-                              <BreadcrumbItem className="hidden md:block">
-                                <BreadcrumbLink href="#">
-                                  Building Your Application
-                                </BreadcrumbLink>
-                              </BreadcrumbItem>
-                              <BreadcrumbSeparator className="hidden md:block" />
-                              <BreadcrumbItem>
-                                <BreadcrumbPage>Data Fetching</BreadcrumbPage>
-                              </BreadcrumbItem>
-                            </BreadcrumbList>
-                          </Breadcrumb>
-                        </header>
+                              <AppSidebar />
+                              <SidebarInset>
+                                <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+                                  <SidebarTrigger className="-ml-1" />
+                                  <Separator orientation="vertical" className="mr-2 h-4" />
+                                  <Breadcrumb>
+                                    <BreadcrumbList>
+                                      <BreadcrumbItem className="hidden md:block">
+                                        <BreadcrumbLink href="#">
+                                          Building Your Application
+                                        </BreadcrumbLink>
+                                      </BreadcrumbItem>
+                                      <BreadcrumbSeparator className="hidden md:block" />
+                                      <BreadcrumbItem>
+                                        <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                                      </BreadcrumbItem>
+                                    </BreadcrumbList>
+                                  </Breadcrumb>
+                                </header>
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">NRI 1501 Leads</h1>
+              <h1 className="text-3xl font-bold text-gray-900">NRI 1503 Leads</h1>
               <p className="text-gray-600 mt-2">
                 Total: <span className="font-semibold">{filteredLeads.length}</span> leads | 
                 Pushed: <span className="font-semibold text-blue-600">
@@ -415,7 +416,7 @@ export default function NRI1502() {
                 <option value="all">All Status</option>
                 <option value="new">New</option>
                 <option value="pushed">Pushed</option>
-                
+               
               </select>
             </div>
 
@@ -963,8 +964,7 @@ export default function NRI1502() {
         />
       )}
     </div>
-
-      </SidebarInset>
-                </SidebarProvider>
+     </SidebarInset>
+                        </SidebarProvider>
   );
 }

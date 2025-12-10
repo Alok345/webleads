@@ -1,6 +1,7 @@
 "use client";
 import * as React from "react";
 import { GalleryVerticalEnd } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { SearchForm } from "@/components/search-form";
 import {
@@ -13,12 +14,13 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { Button } from "./ui/button";
 
 const data = {
   navMain: [
     {
       title: "Dashboard",
-      url: "/",
+      url: "/dashboard",
     },
     {
       title: "NRI 1501",
@@ -30,6 +32,10 @@ const data = {
       url: "/nri-1502",
     },
     {
+      title: "NRI 1503",
+      url: "/nri-1503",
+    },
+    {
       title: "Health Nri 1",
       url: "/health-nri-1",
     },
@@ -37,10 +43,25 @@ const data = {
       title: "Health Nri 2",
       url: "/health-nri-2",
     },
+    {
+      title: "Domestic Gujrat",
+      url: "/dom-guj-01",
+    },
+    
   ],
 };
 
+
 export function AppSidebar(props) {
+
+  const router = useRouter();
+
+function handleLogout() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  router.push("/login");
+}
+
   return (
     <Sidebar {...props}>
       {/* HEADER LOGO */}
@@ -77,7 +98,22 @@ export function AppSidebar(props) {
             ))}
           </SidebarMenu>
         </SidebarGroup>
+
+        
       </SidebarContent>
+<SidebarGroup>
+  <SidebarMenu>
+    <SidebarMenuItem>
+      <Button 
+        variant="destructive"
+        className="w-full"
+        onClick={handleLogout}
+      >
+        Logout
+      </Button>
+    </SidebarMenuItem>
+  </SidebarMenu>
+</SidebarGroup>
 
       <SidebarRail />
     </Sidebar>

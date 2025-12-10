@@ -17,11 +17,9 @@ import { saveAs } from "file-saver";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Download,
-  Filter,
   Search,
   RefreshCw,
   CheckCircle,
-  Clock,
   Eye,
   ChevronLeft,
   ChevronRight,
@@ -52,21 +50,39 @@ export default function NRI1502() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
   const [sortConfig, setSortConfig] = useState({
-    key: "submittedAt",
+    key: "timestamp",
     direction: "desc",
   });
 
   // Fetch leads from Firestore
   useEffect(() => {
-    const q = query(collection(db, "nri-1501"), orderBy("submittedAt", "desc"));
+    // Change "dom-gujrati-01" to your actual collection name
+    const collectionName = "dom-gujrati-01"; // Update this if different
+    
+    // Use timestamp instead of submittedAt
+    const q = query(collection(db, collectionName), orderBy("timestamp", "desc"));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const leadsData = [];
       querySnapshot.forEach((doc) => {
-        leadsData.push({ id: doc.id, ...doc.data() });
+        const data = doc.data();
+        leadsData.push({ 
+          id: doc.id, 
+          ...data,
+          // Map firstName to name for compatibility
+          name: data.firstName || data.name || "",
+          // Ensure phone is string
+          phone: String(data.phone || ""),
+          // Map timestamp to submittedAt
+          submittedAt: data.timestamp,
+        });
       });
+      console.log("Fetched leads:", leadsData); // Debug log
       setLeads(leadsData);
       setFilteredLeads(leadsData);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching leads:", error);
       setLoading(false);
     });
 
@@ -102,6 +118,8 @@ export default function NRI1502() {
       nextDay.setDate(nextDay.getDate() + 1);
 
       result = result.filter((lead) => {
+        if (!lead.submittedAt) return false;
+        
         const leadDate = lead.submittedAt?.toDate();
         if (!leadDate) return false;
         
@@ -122,12 +140,21 @@ export default function NRI1502() {
 
       if (aValue === undefined || bValue === undefined) return 0;
 
-      if (sortConfig.key === "submittedAt" || sortConfig.key === "pushedAt") {
-        const aDate = aValue.toDate();
-        const bDate = bValue.toDate();
+      if (sortConfig.key === "timestamp" || sortConfig.key === "submittedAt") {
+        const aDate = a.submittedAt?.toDate();
+        const bDate = b.submittedAt?.toDate();
+        
+        if (!aDate || !bDate) return 0;
+        
         return sortConfig.direction === "asc" 
           ? aDate.getTime() - bDate.getTime()
           : bDate.getTime() - aDate.getTime();
+      }
+
+      if (sortConfig.key === "age") {
+        const aAge = parseInt(a.age) || 0;
+        const bAge = parseInt(b.age) || 0;
+        return sortConfig.direction === "asc" ? aAge - bAge : bAge - aAge;
       }
 
       if (typeof aValue === "string" && typeof bValue === "string") {
@@ -136,13 +163,10 @@ export default function NRI1502() {
           : bValue.localeCompare(aValue);
       }
 
-      if (typeof aValue === "number" && typeof bValue === "number") {
-        return sortConfig.direction === "asc" ? aValue - bValue : bValue - aValue;
-      }
-
       return 0;
     });
 
+    console.log("Filtered leads:", result.length); // Debug log
     setFilteredLeads(result);
     setCurrentPage(1);
   }, [leads, searchTerm, statusFilter, selectedDate, sortConfig]);
@@ -159,7 +183,7 @@ export default function NRI1502() {
   const handlePushLead = async (leadId) => {
     try {
       setPushingLeadId(leadId);
-      const leadRef = doc(db, "nri-1501", leadId);
+      const leadRef = doc(db, "dom-gujrati-01", leadId);
       
       // Check current status
       const leadDoc = await getDoc(leadRef);
@@ -185,6 +209,7 @@ export default function NRI1502() {
     const worksheetData = filteredLeads.map((lead) => ({
       ID: lead.id,
       Name: lead.name || "",
+      "First Name": lead.firstName || "",
       Phone: lead.phone || "",
       Email: lead.email || "",
       Age: lead.age || "",
@@ -196,6 +221,7 @@ export default function NRI1502() {
       "Pushed At": lead.pushedAt ? lead.pushedAt.toDate().toLocaleString() : "",
       "IP Address": lead.ipAddress || "",
       Language: lead.language || "",
+      Source: lead.source || "",
       Notes: lead.notes || "",
     }));
 
@@ -203,17 +229,13 @@ export default function NRI1502() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Leads");
 
-    // Auto-size columns
-    const maxWidth = worksheetData.reduce((w, r) => Math.max(w, r.Name.length), 10);
-    worksheet["!cols"] = [{ wch: maxWidth + 2 }];
-
     const excelBuffer = XLSX.write(workbook, {
       bookType: "xlsx",
       type: "array",
     });
     const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
 
-    const filename = `NRI-1501-Leads-${new Date().toISOString().split("T")[0]}.xlsx`;
+    const filename = `dom-gujrati-01-Leads-${new Date().toISOString().split("T")[0]}.xlsx`;
     saveAs(blob, filename);
   };
 
@@ -228,7 +250,7 @@ export default function NRI1502() {
     setSearchTerm("");
     setStatusFilter("all");
     setSelectedDate(null);
-    setSortConfig({ key: "submittedAt", direction: "desc" });
+    setSortConfig({ key: "timestamp", direction: "desc" });
   };
 
   // Handle date selection
@@ -260,53 +282,13 @@ export default function NRI1502() {
     });
   };
 
-  // Generate calendar days
-  const generateCalendar = () => {
-    const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
-    
-    const firstDay = new Date(currentYear, currentMonth, 1);
-    const lastDay = new Date(currentYear, currentMonth + 1, 0);
-    
-    const days = [];
-    const startDay = firstDay.getDay();
-    
-    // Previous month's days
-    for (let i = startDay - 1; i >= 0; i--) {
-      const date = new Date(currentYear, currentMonth, -i);
-      days.push({
-        date: date.toISOString().split("T")[0],
-        day: date.getDate(),
-        isCurrentMonth: false,
-        isToday: false,
-        isSelected: selectedDate === date.toISOString().split("T")[0],
-      });
-    }
-    
-    // Current month's days
-    for (let i = 1; i <= lastDay.getDate(); i++) {
-      const date = new Date(currentYear, currentMonth, i);
-      const todayStr = today.toISOString().split("T")[0];
-      const dateStr = date.toISOString().split("T")[0];
-      days.push({
-        date: dateStr,
-        day: i,
-        isCurrentMonth: true,
-        isToday: todayStr === dateStr,
-        isSelected: selectedDate === dateStr,
-      });
-    }
-    
-    return days;
-  };
-
   // Get status badge color
   const getStatusColor = (status) => {
     switch (status) {
       case "pushed":
         return "bg-blue-100 text-blue-800 border border-blue-200";
-      
+      case "new":
+        return "bg-green-100 text-green-800 border border-green-200";
       default:
         return "bg-gray-100 text-gray-800 border border-gray-200";
     }
@@ -324,33 +306,34 @@ export default function NRI1502() {
   }
 
   return (
-    <SidebarProvider>
-                      <AppSidebar />
-                      <SidebarInset>
-                        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-                          <SidebarTrigger className="-ml-1" />
-                          <Separator orientation="vertical" className="mr-2 h-4" />
-                          <Breadcrumb>
-                            <BreadcrumbList>
-                              <BreadcrumbItem className="hidden md:block">
-                                <BreadcrumbLink href="#">
-                                  Building Your Application
-                                </BreadcrumbLink>
-                              </BreadcrumbItem>
-                              <BreadcrumbSeparator className="hidden md:block" />
-                              <BreadcrumbItem>
-                                <BreadcrumbPage>Data Fetching</BreadcrumbPage>
-                              </BreadcrumbItem>
-                            </BreadcrumbList>
-                          </Breadcrumb>
-                        </header>
+
+     <SidebarProvider>
+              <AppSidebar />
+              <SidebarInset>
+                <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+                  <SidebarTrigger className="-ml-1" />
+                  <Separator orientation="vertical" className="mr-2 h-4" />
+                  <Breadcrumb>
+                    <BreadcrumbList>
+                      <BreadcrumbItem className="hidden md:block">
+                        <BreadcrumbLink href="#">
+                          Building Your Application
+                        </BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator className="hidden md:block" />
+                      <BreadcrumbItem>
+                        <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                      </BreadcrumbItem>
+                    </BreadcrumbList>
+                  </Breadcrumb>
+                </header>
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">NRI 1501 Leads</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Domestic Gujrati Leads</h1>
               <p className="text-gray-600 mt-2">
                 Total: <span className="font-semibold">{filteredLeads.length}</span> leads | 
                 Pushed: <span className="font-semibold text-blue-600">
@@ -415,104 +398,7 @@ export default function NRI1502() {
                 <option value="all">All Status</option>
                 <option value="new">New</option>
                 <option value="pushed">Pushed</option>
-                
               </select>
-            </div>
-
-            <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date Filter
-              </label>
-              <div className="relative">
-                <button
-                  onClick={() => setShowDatePicker(!showDatePicker)}
-                  className={`w-full px-4 py-2.5 border ${
-                    selectedDate ? "border-blue-500" : "border-gray-300"
-                  } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition flex items-center justify-between`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    <span className={selectedDate ? "text-blue-600" : "text-gray-500"}>
-                      {selectedDate ? formatDate(selectedDate) : "Select a date"}
-                    </span>
-                  </div>
-                  {selectedDate && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleClearDate();
-                      }}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </button>
-                
-                {/* Calendar Popup */}
-                {showDatePicker && (
-                  <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-200 z-50">
-                    <div className="p-4">
-                      {/* Calendar Header */}
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold text-gray-900">
-                          {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-                        </h3>
-                        <button
-                          onClick={() => handleDateSelect(new Date().toISOString().split("T")[0])}
-                          className="px-3 py-1.5 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-                        >
-                          Today
-                        </button>
-                      </div>
-                      
-                      {/* Week Days */}
-                      <div className="grid grid-cols-7 gap-1 mb-2">
-                        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                          <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
-                            {day}
-                          </div>
-                        ))}
-                      </div>
-                      
-                      {/* Calendar Days */}
-                      <div className="grid grid-cols-7 gap-1">
-                        {generateCalendar().map((day) => (
-                          <button
-                            key={day.date}
-                            onClick={() => handleDateSelect(day.date)}
-                            className={`
-                              h-10 rounded-lg text-sm font-medium transition-colors
-                              ${!day.isCurrentMonth ? "text-gray-400" : ""}
-                              ${day.isToday ? "bg-blue-50 text-blue-600" : ""}
-                              ${day.isSelected ? "bg-blue-600 text-white" : ""}
-                              ${day.isCurrentMonth && !day.isSelected && !day.isToday ? "hover:bg-gray-100" : ""}
-                            `}
-                          >
-                            {day.day}
-                          </button>
-                        ))}
-                      </div>
-                      
-                      {/* Quick Actions */}
-                      <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
-                        <button
-                          onClick={() => handleClearDate()}
-                          className="flex-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                          Clear
-                        </button>
-                        <button
-                          onClick={() => setShowDatePicker(false)}
-                          className="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                          Apply
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
 
             <div>
@@ -524,7 +410,7 @@ export default function NRI1502() {
                 onChange={(e) => handleSort(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
               >
-                <option value="submittedAt">Date (Newest)</option>
+                <option value="timestamp">Date (Newest)</option>
                 <option value="name">Name</option>
                 <option value="age">Age</option>
                 <option value="income">Income</option>
@@ -539,63 +425,23 @@ export default function NRI1502() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => handleSort("name")}
-                  >
-                    <div className="flex items-center gap-1">
-                      Name
-                      {sortConfig.key === "name" && (
-                        <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
-                      )}
-                    </div>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Name
                   </th>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => handleSort("phone")}
-                  >
-                    <div className="flex items-center gap-1">
-                      Phone
-                      {sortConfig.key === "phone" && (
-                        <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
-                      )}
-                    </div>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Phone
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Email
                   </th>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => handleSort("age")}
-                  >
-                    <div className="flex items-center gap-1">
-                      Age
-                      {sortConfig.key === "age" && (
-                        <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
-                      )}
-                    </div>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Age
                   </th>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => handleSort("income")}
-                  >
-                    <div className="flex items-center gap-1">
-                      Income
-                      {sortConfig.key === "income" && (
-                        <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
-                      )}
-                    </div>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Income
                   </th>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => handleSort("submittedAt")}
-                  >
-                    <div className="flex items-center gap-1">
-                      Date
-                      {sortConfig.key === "submittedAt" && (
-                        <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
-                      )}
-                    </div>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -616,24 +462,11 @@ export default function NRI1502() {
                       className="hover:bg-gray-50 transition-colors"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          {/* <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                            <User className="h-4 w-4 text-blue-600" />
-                          </div> */}
-                          <div>
-                            <div className="font-medium text-gray-900">{lead.name}</div>
-                            <div className="text-sm text-gray-500">ID: {lead.id.substring(0, 8)}...</div>
-                          </div>
-                        </div>
+                        <div className="font-medium text-gray-900">{lead.name || lead.firstName || "N/A"}</div>
+                        <div className="text-sm text-gray-500">ID: {lead.id.substring(0, 8)}...</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          {/* <Phone className="h-4 w-4 text-gray-400" /> */}
-                          <div>
-                            <div className="font-medium">{lead.phone}</div>
-                            <div className="text-sm text-gray-500">{lead.countryCode}</div>
-                          </div>
-                        </div>
+                        <div className="font-medium">{lead.phone || "N/A"}</div>
                       </td>
                       <td className="px-6 py-4">
                         <a
@@ -641,21 +474,22 @@ export default function NRI1502() {
                           className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-2"
                         >
                           <Mail className="h-4 w-4" />
-                          {lead.email}
+                          {lead.email || "N/A"}
                         </a>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className="font-medium">{lead.age}</div>
-                          <div className="text-sm text-gray-500">
-                            ({lead.year_of_birth})
-                          </div>
-                        </div>
+                        <div className="font-medium">{lead.age || "N/A"}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <DollarSign className="h-4 w-4 text-green-600" />
-                          <span className="font-medium">{lead.income}</span>
+                          <span className="font-medium">
+                            {lead.income === "below_3" ? "Below 3 lakh" : 
+                             lead.income === "3_5" ? "3 lakh - 5 lakh" :
+                             lead.income === "5_10" ? "5 lakh - 10 lakh" :
+                             lead.income === "10_15" ? "10 lakh - 15 lakh" :
+                             lead.income === "above_15" ? "Above 15 lakh" : lead.income || "N/A"}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -666,7 +500,7 @@ export default function NRI1502() {
                               month: "short",
                               day: "numeric",
                               year: "numeric",
-                            })}
+                            }) || "N/A"}
                           </span>
                         </div>
                       </td>
@@ -721,9 +555,7 @@ export default function NRI1502() {
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No leads found</h3>
                 <p className="text-gray-500">
-                  {selectedDate 
-                    ? `No leads submitted on ${formatDate(selectedDate)}. Try another date or remove the date filter.`
-                    : "Try adjusting your search or filter to find what you're looking for."}
+                  Try adjusting your search or filter to find what you're looking for.
                 </p>
               </div>
             )}
@@ -803,7 +635,9 @@ export default function NRI1502() {
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">Lead Details</h2>
                   <p className="text-gray-600 mt-1">
-                    Submitted on {selectedLead.submittedAt?.toDate().toLocaleString()}
+                    {selectedLead.submittedAt ? 
+                      `Submitted on ${selectedLead.submittedAt.toDate().toLocaleString()}` : 
+                      "Date not available"}
                   </p>
                 </div>
                 <button
@@ -826,15 +660,15 @@ export default function NRI1502() {
                   <div className="space-y-3">
                     <div>
                       <label className="text-sm font-medium text-gray-500">Name</label>
-                      <p className="mt-1 text-gray-900">{selectedLead.name}</p>
+                      <p className="mt-1 text-gray-900">{selectedLead.name || selectedLead.firstName || "N/A"}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Age</label>
-                      <p className="mt-1 text-gray-900">{selectedLead.age} years</p>
+                      <p className="mt-1 text-gray-900">{selectedLead.age || "N/A"} years</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Year of Birth</label>
-                      <p className="mt-1 text-gray-900">{selectedLead.year_of_birth}</p>
+                      <p className="mt-1 text-gray-900">{selectedLead.year_of_birth || "N/A"}</p>
                     </div>
                   </div>
                 </div>
@@ -848,9 +682,9 @@ export default function NRI1502() {
                   <div className="space-y-3">
                     <div>
                       <label className="text-sm font-medium text-gray-500">Phone</label>
-                      <p className="mt-1 text-gray-900 flex items-center gap-2">
-                        <Globe className="h-4 w-4 text-gray-400" />
-                        {selectedLead.countryCode} {selectedLead.phoneNumber}
+                      <p className="mt-1 text-gray-900">
+                        {selectedLead.countryCode ? `${selectedLead.countryCode} ` : ""}
+                        {selectedLead.phone || "N/A"}
                       </p>
                     </div>
                     <div>
@@ -860,7 +694,7 @@ export default function NRI1502() {
                         className="mt-1 text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-2"
                       >
                         <Mail className="h-4 w-4" />
-                        {selectedLead.email}
+                        {selectedLead.email || "N/A"}
                       </a>
                     </div>
                   </div>
@@ -875,7 +709,13 @@ export default function NRI1502() {
                   <div className="space-y-3">
                     <div>
                       <label className="text-sm font-medium text-gray-500">Income</label>
-                      <p className="mt-1 text-gray-900">{selectedLead.income}</p>
+                      <p className="mt-1 text-gray-900">
+                        {selectedLead.income === "below_3" ? "Below $3,000" : 
+                         selectedLead.income === "3_5" ? "$3,000 - $5,000" :
+                         selectedLead.income === "5_8" ? "$5,000 - $8,000" :
+                         selectedLead.income === "8_10" ? "$8,000 - $10,000" :
+                         selectedLead.income === "above_10" ? "Above $10,000" : selectedLead.income || "N/A"}
+                      </p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Status</label>
@@ -900,18 +740,16 @@ export default function NRI1502() {
                   </h3>
                   <div className="space-y-3">
                     <div>
+                      <label className="text-sm font-medium text-gray-500">Source</label>
+                      <p className="mt-1 text-gray-900">{selectedLead.source || "N/A"}</p>
+                    </div>
+                    <div>
                       <label className="text-sm font-medium text-gray-500">Language</label>
                       <p className="mt-1 text-gray-900">{selectedLead.language || "English"}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">IP Address</label>
                       <p className="mt-1 text-gray-900">{selectedLead.ipAddress || "N/A"}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Device</label>
-                      <p className="mt-1 text-gray-900 text-sm truncate">
-                        {selectedLead.userAgent?.substring(0, 50)}...
-                      </p>
                     </div>
                   </div>
                 </div>
@@ -954,17 +792,8 @@ export default function NRI1502() {
           </div>
         </div>
       )}
-
-      {/* Close calendar when clicking outside */}
-      {showDatePicker && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setShowDatePicker(false)}
-        />
-      )}
     </div>
-
-      </SidebarInset>
-                </SidebarProvider>
+    </SidebarInset>
+            </SidebarProvider>
   );
 }

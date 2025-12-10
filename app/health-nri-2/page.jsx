@@ -31,7 +31,12 @@ import {
   Calendar,
   DollarSign,
   Globe,
+  X,
 } from "lucide-react";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
+import { Separator } from "@/components/ui/separator";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 
 export default function NRI1502() {
   const [leads, setLeads] = useState([]);
@@ -39,7 +44,8 @@ export default function NRI1502() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("all");
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [pushingLeadId, setPushingLeadId] = useState(null);
@@ -89,26 +95,23 @@ export default function NRI1502() {
     }
 
     // Apply date filter
-    if (dateFilter !== "all") {
-      const now = new Date();
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    if (selectedDate) {
+      const selected = new Date(selectedDate);
+      selected.setHours(0, 0, 0, 0);
+      const nextDay = new Date(selected);
+      nextDay.setDate(nextDay.getDate() + 1);
 
       result = result.filter((lead) => {
         const leadDate = lead.submittedAt?.toDate();
         if (!leadDate) return false;
         
-        switch (dateFilter) {
-          case "today":
-            return leadDate >= startOfToday;
-          case "week":
-            return leadDate >= startOfWeek;
-          case "month":
-            return leadDate >= startOfMonth;
-          default:
-            return true;
-        }
+        const leadDateOnly = new Date(
+          leadDate.getFullYear(),
+          leadDate.getMonth(),
+          leadDate.getDate()
+        );
+        
+        return leadDateOnly >= selected && leadDateOnly < nextDay;
       });
     }
 
@@ -142,7 +145,7 @@ export default function NRI1502() {
 
     setFilteredLeads(result);
     setCurrentPage(1);
-  }, [leads, searchTerm, statusFilter, dateFilter, sortConfig]);
+  }, [leads, searchTerm, statusFilter, selectedDate, sortConfig]);
 
   // Handle sort
   const handleSort = (key) => {
@@ -210,7 +213,7 @@ export default function NRI1502() {
     });
     const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
 
-    const filename = `NRI-1501-Leads-${new Date().toISOString().split("T")[0]}.xlsx`;
+    const filename = `Health-NRI-2-Leads-${new Date().toISOString().split("T")[0]}.xlsx`;
     saveAs(blob, filename);
   };
 
@@ -224,8 +227,19 @@ export default function NRI1502() {
   const handleResetFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
-    setDateFilter("all");
+    setSelectedDate(null);
     setSortConfig({ key: "submittedAt", direction: "desc" });
+  };
+
+  // Handle date selection
+  const handleDateSelect = (date) => {
+    setSelectedDate(date);
+    setShowDatePicker(false);
+  };
+
+  // Clear date filter
+  const handleClearDate = () => {
+    setSelectedDate(null);
   };
 
   // Calculate pagination
@@ -233,6 +247,59 @@ export default function NRI1502() {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredLeads.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  // Generate calendar days
+  const generateCalendar = () => {
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    
+    const days = [];
+    const startDay = firstDay.getDay();
+    
+    // Previous month's days
+    for (let i = startDay - 1; i >= 0; i--) {
+      const date = new Date(currentYear, currentMonth, -i);
+      days.push({
+        date: date.toISOString().split("T")[0],
+        day: date.getDate(),
+        isCurrentMonth: false,
+        isToday: false,
+        isSelected: selectedDate === date.toISOString().split("T")[0],
+      });
+    }
+    
+    // Current month's days
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+      const date = new Date(currentYear, currentMonth, i);
+      const todayStr = today.toISOString().split("T")[0];
+      const dateStr = date.toISOString().split("T")[0];
+      days.push({
+        date: dateStr,
+        day: i,
+        isCurrentMonth: true,
+        isToday: todayStr === dateStr,
+        isSelected: selectedDate === dateStr,
+      });
+    }
+    
+    return days;
+  };
 
   // Get status badge color
   const getStatusColor = (status) => {
@@ -260,13 +327,33 @@ export default function NRI1502() {
   }
 
   return (
+    <SidebarProvider>
+                  <AppSidebar />
+                  <SidebarInset>
+                    <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+                      <SidebarTrigger className="-ml-1" />
+                      <Separator orientation="vertical" className="mr-2 h-4" />
+                      <Breadcrumb>
+                        <BreadcrumbList>
+                          <BreadcrumbItem className="hidden md:block">
+                            <BreadcrumbLink href="#">
+                              Building Your Application
+                            </BreadcrumbLink>
+                          </BreadcrumbItem>
+                          <BreadcrumbSeparator className="hidden md:block" />
+                          <BreadcrumbItem>
+                            <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                          </BreadcrumbItem>
+                        </BreadcrumbList>
+                      </Breadcrumb>
+                    </header>
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">health nri 1 Leads</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Health NRI 1502</h1>
               <p className="text-gray-600 mt-2">
                 Total: <span className="font-semibold">{filteredLeads.length}</span> leads | 
                 Pushed: <span className="font-semibold text-blue-600">
@@ -275,6 +362,11 @@ export default function NRI1502() {
                 New: <span className="font-semibold text-green-600">
                   {leads.filter((l) => !l.status || l.status === "new").length}
                 </span>
+                {selectedDate && (
+                  <span className="ml-4 text-blue-600">
+                    | Showing: {formatDate(selectedDate)}
+                  </span>
+                )}
               </p>
             </div>
 
@@ -326,25 +418,104 @@ export default function NRI1502() {
                 <option value="all">All Status</option>
                 <option value="new">New</option>
                 <option value="pushed">Pushed</option>
-                <option value="contacted">Contacted</option>
-                <option value="converted">Converted</option>
+               
               </select>
             </div>
 
-            <div>
+            <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date Range
+                Date Filter
               </label>
-              <select
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-              >
-                <option value="all">All Time</option>
-                <option value="today">Today</option>
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
-              </select>
+              <div className="relative">
+                <button
+                  onClick={() => setShowDatePicker(!showDatePicker)}
+                  className={`w-full px-4 py-2.5 border ${
+                    selectedDate ? "border-blue-500" : "border-gray-300"
+                  } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition flex items-center justify-between`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-gray-400" />
+                    <span className={selectedDate ? "text-blue-600" : "text-gray-500"}>
+                      {selectedDate ? formatDate(selectedDate) : "Select a date"}
+                    </span>
+                  </div>
+                  {selectedDate && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleClearDate();
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </button>
+                
+                {/* Calendar Popup */}
+                {showDatePicker && (
+                  <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-200 z-50">
+                    <div className="p-4">
+                      {/* Calendar Header */}
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold text-gray-900">
+                          {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                        </h3>
+                        <button
+                          onClick={() => handleDateSelect(new Date().toISOString().split("T")[0])}
+                          className="px-3 py-1.5 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                        >
+                          Today
+                        </button>
+                      </div>
+                      
+                      {/* Week Days */}
+                      <div className="grid grid-cols-7 gap-1 mb-2">
+                        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                          <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
+                            {day}
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {/* Calendar Days */}
+                      <div className="grid grid-cols-7 gap-1">
+                        {generateCalendar().map((day) => (
+                          <button
+                            key={day.date}
+                            onClick={() => handleDateSelect(day.date)}
+                            className={`
+                              h-10 rounded-lg text-sm font-medium transition-colors
+                              ${!day.isCurrentMonth ? "text-gray-400" : ""}
+                              ${day.isToday ? "bg-blue-50 text-blue-600" : ""}
+                              ${day.isSelected ? "bg-blue-600 text-white" : ""}
+                              ${day.isCurrentMonth && !day.isSelected && !day.isToday ? "hover:bg-gray-100" : ""}
+                            `}
+                          >
+                            {day.day}
+                          </button>
+                        ))}
+                      </div>
+                      
+                      {/* Quick Actions */}
+                      <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
+                        <button
+                          onClick={() => handleClearDate()}
+                          className="flex-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          Clear
+                        </button>
+                        <button
+                          onClick={() => setShowDatePicker(false)}
+                          className="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>
@@ -364,51 +535,6 @@ export default function NRI1502() {
             </div>
           </div>
         </div>
-
-        {/* Pushed Leads at Top */}
-        {/* {filteredLeads.some((lead) => lead.status === "pushed") && (
-          <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl shadow-sm p-6 mb-6 border border-blue-200">
-            <div className="flex items-center gap-3 mb-4">
-              <CheckCircle className="h-6 w-6 text-blue-600" />
-              <h2 className="text-xl font-bold text-blue-800">Recently Pushed Leads</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {filteredLeads
-                .filter((lead) => lead.status === "pushed")
-                .slice(0, 4)
-                .map((lead) => (
-                  <div
-                    key={lead.id}
-                    className="bg-white rounded-lg border border-blue-200 p-4 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-blue-600" />
-                        <h3 className="font-semibold text-gray-900">{lead.name}</h3>
-                      </div>
-                      <span className="px-2.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                        Pushed
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Phone className="h-3.5 w-3.5" />
-                        <span>{lead.phone}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Calendar className="h-3.5 w-3.5" />
-                        <span>
-                          {lead.pushedAt
-                            ? lead.pushedAt.toDate().toLocaleDateString()
-                            : "Just now"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-        )} */}
 
         {/* Leads Table */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -457,7 +583,7 @@ export default function NRI1502() {
                     onClick={() => handleSort("income")}
                   >
                     <div className="flex items-center gap-1">
-                      Income
+                      City
                       {sortConfig.key === "income" && (
                         <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
                       )}
@@ -494,9 +620,9 @@ export default function NRI1502() {
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                          {/* <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
                             <User className="h-4 w-4 text-blue-600" />
-                          </div>
+                          </div> */}
                           <div>
                             <div className="font-medium text-gray-900">{lead.name}</div>
                             <div className="text-sm text-gray-500">ID: {lead.id.substring(0, 8)}...</div>
@@ -505,7 +631,7 @@ export default function NRI1502() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-gray-400" />
+                          {/* <Phone className="h-4 w-4 text-gray-400" /> */}
                           <div>
                             <div className="font-medium">{lead.phone}</div>
                             <div className="text-sm text-gray-500">{lead.countryCode}</div>
@@ -531,8 +657,8 @@ export default function NRI1502() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <DollarSign className="h-4 w-4 text-green-600" />
-                          <span className="font-medium">{lead.income}</span>
+                          {/* <DollarSign className="h-4 w-4 text-green-600" /> */}
+                          <span className="font-medium">{lead.city}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -598,7 +724,9 @@ export default function NRI1502() {
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No leads found</h3>
                 <p className="text-gray-500">
-                  Try adjusting your search or filter to find what you're looking for.
+                  {selectedDate 
+                    ? `No leads submitted on ${formatDate(selectedDate)}. Try another date or remove the date filter.`
+                    : "Try adjusting your search or filter to find what you're looking for."}
                 </p>
               </div>
             )}
@@ -829,6 +957,17 @@ export default function NRI1502() {
           </div>
         </div>
       )}
+
+      {/* Close calendar when clicking outside */}
+      {showDatePicker && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowDatePicker(false)}
+        />
+      )}
     </div>
+
+    </SidebarInset>
+            </SidebarProvider>
   );
 }
