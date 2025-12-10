@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { GalleryVerticalEnd } from "lucide-react";
+import { GalleryVerticalEnd, ChevronDown, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { SearchForm } from "@/components/search-form";
@@ -15,52 +15,104 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { Button } from "./ui/button";
+import { useState } from "react";
 
 const data = {
   navMain: [
     {
       title: "Dashboard",
       url: "/dashboard",
+      type: "single",
     },
     {
-      title: "NRI 1501",
-      url: "/nri-1501",
-    },
-    
-    {
-      title: "NRI 1502",
-      url: "/nri-1502",
-    },
-    {
-      title: "NRI 1503",
-      url: "/nri-1503",
-    },
-    {
-      title: "Health Nri 1",
-      url: "/health-nri-1",
-    },
-    {
-      title: "Health Nri 2",
-      url: "/health-nri-2",
+      title: "NRI Leads",
+      type: "dropdown",
+      items: [
+        {
+          title: "NRI 1501",
+          url: "/nri-1501",
+        },
+        {
+          title: "NRI 1502",
+          url: "/nri-1502",
+        },
+        {
+          title: "NRI 1503",
+          url: "/nri-1503",
+        },
+      ],
     },
     {
-      title: "Domestic Gujrat",
-      url: "/dom-guj-01",
+      title: "Health NRI Leads",
+      type: "dropdown",
+      items: [
+        {
+          title: "Health NRI 1",
+          url: "/health-nri-1",
+        },
+        {
+          title: "Health NRI 2",
+          url: "/health-nri-2",
+        },
+      ],
     },
-    
+    {
+      title: "Domestic Leads",
+      type: "dropdown",
+      items: [
+        {
+          title: "Gujarat 1509",
+          url: "/dom-guj-01",
+        },
+        {
+          title: "English 1503",
+          url: "/dom-eng-01",
+        },
+        {
+          title: "Hindi",
+          url: "/dom-hin-01",
+        },
+        {
+          title: "Malayalam",
+          url: "/dom-mal-01",
+        },
+        {
+          title: "Marathi",
+          url: "/dom-mar-01",
+        },
+        {
+          title: "Punjabi",
+          url: "/dom-pun-01",
+        },
+        {
+          title: "Telugu",
+          url: "/dom-tel-01",
+        },
+        {
+          title: "Bengali 1510",
+          url: "/dom-ben-01",
+        },
+      ],
+    },
   ],
 };
 
-
 export function AppSidebar(props) {
-
   const router = useRouter();
+  const [expandedDropdowns, setExpandedDropdowns] = useState({});
 
-function handleLogout() {
-  localStorage.removeItem("token");
-  localStorage.removeItem("user");
-  router.push("/login");
-}
+  function handleLogout() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    router.push("/login");
+  }
+
+  const toggleDropdown = (title) => {
+    setExpandedDropdowns((prev) => ({
+      ...prev,
+      [title]: !prev[title],
+    }));
+  };
 
   return (
     <Sidebar {...props}>
@@ -89,31 +141,71 @@ function handleLogout() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
-            {data.navMain.map((item) => (
-              <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild>
-                  <a href={item.url}>{item.title}</a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
+            {data.navMain.map((item) => {
+              if (item.type === "single") {
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <a href={item.url}>{item.title}</a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              }
+
+              if (item.type === "dropdown") {
+                const isExpanded = expandedDropdowns[item.title];
+                return (
+                  <React.Fragment key={item.title}>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        onClick={() => toggleDropdown(item.title)}
+                        className="justify-between cursor-pointer"
+                      >
+                        <span>{item.title}</span>
+                        {isExpanded ? (
+                          <ChevronDown className="size-4" />
+                        ) : (
+                          <ChevronRight className="size-4" />
+                        )}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    
+                    {/* Dropdown Items */}
+                    {isExpanded && (
+                      <div className="ml-4 pl-2 border-l border-sidebar-border">
+                        <SidebarMenu>
+                          {item.items.map((subItem) => (
+                            <SidebarMenuItem key={subItem.title}>
+                              <SidebarMenuButton asChild className="pl-6">
+                                <a href={subItem.url}>{subItem.title}</a>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          ))}
+                        </SidebarMenu>
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              }
+
+              return null;
+            })}
           </SidebarMenu>
         </SidebarGroup>
-
-        
       </SidebarContent>
-<SidebarGroup>
-  <SidebarMenu>
-    <SidebarMenuItem>
-      <Button 
-        variant="destructive"
-        className="w-full"
-        onClick={handleLogout}
-      >
-        Logout
-      </Button>
-    </SidebarMenuItem>
-  </SidebarMenu>
-</SidebarGroup>
+      <SidebarGroup>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <Button
+              variant="destructive"
+              className="w-full"
+              onClick={handleLogout}
+            >
+              Logout
+            </Button>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
 
       <SidebarRail />
     </Sidebar>

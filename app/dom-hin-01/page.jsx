@@ -93,7 +93,7 @@ export default function NRI1502() {
 
   // Fetch leads from Firestore
   useEffect(() => {
-    const collectionName = "dom-gujrati-01";
+    const collectionName = "dom-hindi-01";
     const q = query(collection(db, collectionName), orderBy("timestamp", "desc"));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -205,7 +205,7 @@ export default function NRI1502() {
   const handlePushLead = async (leadId) => {
     try {
       setPushingLeadId(leadId);
-      const leadRef = doc(db, "dom-gujrati-01", leadId);
+      const leadRef = doc(db, "dom-hindi-01", leadId);
       
       const leadDoc = await getDoc(leadRef);
       const currentStatus = leadDoc.data()?.status;
@@ -232,7 +232,7 @@ export default function NRI1502() {
 
     try {
       setMarkingDuplicateId(leadId);
-      const leadRef = doc(db, "dom-gujrati-01", leadId);
+      const leadRef = doc(db, "dom-hindi-01", leadId);
       
       const leadDoc = await getDoc(leadRef);
       const currentStatus = leadDoc.data()?.status;
@@ -296,7 +296,7 @@ export default function NRI1502() {
     });
     const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
 
-    const filename = `dom-gujrati-01-Leads-${new Date().toISOString().split("T")[0]}.xlsx`;
+    const filename = `dom-hindi-01-Leads-${new Date().toISOString().split("T")[0]}.xlsx`;
     saveAs(blob, filename);
   };
 
@@ -406,7 +406,7 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
             <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Domestic Gujrati Leads</h1>
+                  <h1 className="text-3xl font-bold text-gray-900">Domestic Hindi Leads</h1>
                   <p className="text-gray-600 mt-2">
                     Total: <span className="font-semibold">{filteredLeads.length}</span> leads | 
                     Pushed: <span className="font-semibold text-blue-600">
