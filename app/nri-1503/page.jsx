@@ -53,7 +53,7 @@ export default function NRI1502() {
   const [pushingLeadId, setPushingLeadId] = useState(null);
   const [markingDuplicateId, setMarkingDuplicateId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(20);
+  const [itemsPerPage] = useState(30);
   const [sortConfig, setSortConfig] = useState({
     key: "submittedAt",
     direction: "desc",

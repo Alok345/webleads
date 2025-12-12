@@ -40,6 +40,10 @@ const data = {
           title: "NRI 1503",
           url: "/nri-1503",
         },
+        {
+          title: "NRI 1504",
+          url: "/nri-1504",
+        },
       ],
     },
     {
@@ -69,7 +73,7 @@ const data = {
           url: "/dom-eng-01",
         },
         {
-          title: "Hindi",
+          title: "Hindi 1504",
           url: "/dom-hin-01",
         },
         {

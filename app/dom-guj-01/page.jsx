@@ -53,7 +53,7 @@ export default function NRI1502() {
   const [pushingLeadId, setPushingLeadId] = useState(null);
   const [markingDuplicateId, setMarkingDuplicateId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(20);
+  const [itemsPerPage] = useState(30);
   const [sortConfig, setSortConfig] = useState({
     key: "timestamp",
     direction: "desc",
@@ -587,6 +587,9 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Income
                       </th>
+                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        City
+                      </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Date (IST)
                       </th>
@@ -638,6 +641,9 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                                  lead.income === "above_15" ? "Above 15 lakh" : lead.income || "N/A"}
                               </span>
                             </div>
+                          </td>
+                           <td className="px-6 py-4">
+                            <div className="font-medium">{lead.city || "N/A"}</div>
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">

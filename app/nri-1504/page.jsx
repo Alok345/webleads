@@ -17,9 +17,11 @@ import { saveAs } from "file-saver";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Download,
+  Filter,
   Search,
   RefreshCw,
   CheckCircle,
+  Clock,
   Eye,
   ChevronLeft,
   ChevronRight,
@@ -32,7 +34,6 @@ import {
   X,
   CalendarDays,
   Copy,
-  Check,
   AlertCircle,
 } from "lucide-react";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -46,8 +47,7 @@ export default function NRI1502() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [calendarDate, setCalendarDate] = useState("");
   const [selectedLead, setSelectedLead] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [pushingLeadId, setPushingLeadId] = useState(null);
@@ -55,17 +55,39 @@ export default function NRI1502() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(30);
   const [sortConfig, setSortConfig] = useState({
-    key: "timestamp",
+    key: "submittedAt",
     direction: "desc",
   });
-  const [calendarDate, setCalendarDate] = useState("");
 
-  // Function to convert UTC to IST
+  // Function to convert UTC to IST - Updated to handle multiple date formats
   const convertUTCtoIST = (date) => {
     if (!date) return null;
-    const utcDate = new Date(date);
+    
+    let dateObj;
+    
+    if (typeof date === 'string') {
+      // Handle string date
+      dateObj = new Date(date);
+    } else if (date && typeof date.toDate === 'function') {
+      // Handle Firestore Timestamp object
+      dateObj = date.toDate();
+    } else if (date instanceof Date) {
+      // Already a Date object
+      dateObj = date;
+    } else if (date && date.seconds) {
+      // Handle Firestore timestamp with seconds
+      dateObj = new Date(date.seconds * 1000);
+    } else {
+      return null;
+    }
+    
+    // Check if date is valid
+    if (isNaN(dateObj.getTime())) {
+      return null;
+    }
+    
     // IST is UTC+5:30
-    return new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+    return new Date(dateObj.getTime() + (5.5 * 60 * 60 * 1000));
   };
 
   // Function to get IST date string (YYYY-MM-DD format)
@@ -91,29 +113,76 @@ export default function NRI1502() {
     );
   };
 
-  // Fetch leads from Firestore
+  // Fetch leads from Firestore - Updated to handle string timestamps
   useEffect(() => {
-    const collectionName = "dom-bangali-01";
-    const q = query(collection(db, collectionName), orderBy("timestamp", "desc"));
+    const q = query(collection(db, "nri-1504"), orderBy("timestamp", "desc"));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const leadsData = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        leadsData.push({ 
-          id: doc.id, 
-          ...data,
-          name: data.firstName || data.name || "",
-          phone: String(data.phone || ""),
-          submittedAt: data.timestamp,
-        });
+        
+        // Normalize the data structure
+        const normalizedData = {
+          id: doc.id,
+          name: data.name || "",
+          email: data.email || "",
+          phone: data.phone || "",
+          fullPhoneNumber: data.fullPhoneNumber || data.phone || "",
+          countryCode: data.countryCode || "",
+          age: data.age || "",
+          year_of_birth: data.year_of_birth || data.year || "",
+          income: data.income || "",
+          campaign: data.campaign || "",
+          status: data.status || "new",
+          language: data.language || "English",
+          ipAddress: data.ipAddress || "",
+          source: data.source || "",
+          notes: data.notes || "",
+          verifiedAt: data.verifiedAt || "",
+          // Handle timestamps - create a consistent interface
+          timestamp: data.timestamp || "",
+          submittedAt: {
+            toDate: () => {
+              if (data.timestamp) {
+                return new Date(data.timestamp);
+              } else if (data.submittedAt) {
+                if (typeof data.submittedAt.toDate === 'function') {
+                  return data.submittedAt.toDate();
+                } else if (typeof data.submittedAt === 'string') {
+                  return new Date(data.submittedAt);
+                }
+              }
+              return new Date();
+            }
+          },
+          pushedAt: data.pushedAt ? {
+            toDate: () => {
+              if (typeof data.pushedAt.toDate === 'function') {
+                return data.pushedAt.toDate();
+              } else if (typeof data.pushedAt === 'string') {
+                return new Date(data.pushedAt);
+              }
+              return new Date(data.pushedAt);
+            }
+          } : null,
+          duplicateMarkedAt: data.duplicateMarkedAt ? {
+            toDate: () => {
+              if (typeof data.duplicateMarkedAt.toDate === 'function') {
+                return data.duplicateMarkedAt.toDate();
+              } else if (typeof data.duplicateMarkedAt === 'string') {
+                return new Date(data.duplicateMarkedAt);
+              }
+              return new Date(data.duplicateMarkedAt);
+            }
+          } : null,
+          duplicateMarkedBy: data.duplicateMarkedBy || ""
+        };
+        
+        leadsData.push(normalizedData);
       });
-      console.log("Fetched leads:", leadsData);
       setLeads(leadsData);
       setFilteredLeads(leadsData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching leads:", error);
       setLoading(false);
     });
 
@@ -131,6 +200,7 @@ export default function NRI1502() {
         (lead) =>
           lead.name?.toLowerCase().includes(term) ||
           lead.phone?.toLowerCase().includes(term) ||
+          lead.fullPhoneNumber?.toLowerCase().includes(term) ||
           lead.email?.toLowerCase().includes(term) ||
           lead.id?.toLowerCase().includes(term)
       );
@@ -143,11 +213,9 @@ export default function NRI1502() {
 
     // Apply date filter using IST
     if (calendarDate) {
-      const selectedISTDate = new Date(calendarDate + 'T00:00:00Z'); // Treat as UTC date
+      const selectedISTDate = new Date(calendarDate + 'T00:00:00Z');
       
       result = result.filter((lead) => {
-        if (!lead.submittedAt) return false;
-        
         const leadDate = lead.submittedAt?.toDate();
         if (!leadDate) return false;
         
@@ -162,9 +230,9 @@ export default function NRI1502() {
 
       if (aValue === undefined || bValue === undefined) return 0;
 
-      if (sortConfig.key === "timestamp" || sortConfig.key === "submittedAt") {
-        const aDate = a.submittedAt?.toDate();
-        const bDate = b.submittedAt?.toDate();
+      if (sortConfig.key === "submittedAt") {
+        const aDate = aValue?.toDate ? aValue.toDate() : new Date(a.timestamp || 0);
+        const bDate = bValue?.toDate ? bValue.toDate() : new Date(b.timestamp || 0);
         
         if (!aDate || !bDate) return 0;
         
@@ -173,10 +241,17 @@ export default function NRI1502() {
           : bDate.getTime() - aDate.getTime();
       }
 
-      if (sortConfig.key === "age") {
-        const aAge = parseInt(a.age) || 0;
-        const bAge = parseInt(b.age) || 0;
-        return sortConfig.direction === "asc" ? aAge - bAge : bAge - aAge;
+      if (sortConfig.key === "pushedAt" || sortConfig.key === "duplicateMarkedAt") {
+        const aDate = aValue?.toDate ? aValue.toDate() : null;
+        const bDate = bValue?.toDate ? bValue.toDate() : null;
+        
+        if (!aDate && !bDate) return 0;
+        if (!aDate) return 1;
+        if (!bDate) return -1;
+        
+        return sortConfig.direction === "asc" 
+          ? aDate.getTime() - bDate.getTime()
+          : bDate.getTime() - aDate.getTime();
       }
 
       if (typeof aValue === "string" && typeof bValue === "string") {
@@ -185,10 +260,13 @@ export default function NRI1502() {
           : bValue.localeCompare(aValue);
       }
 
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        return sortConfig.direction === "asc" ? aValue - bValue : bValue - aValue;
+      }
+
       return 0;
     });
 
-    console.log("Filtered leads:", result.length);
     setFilteredLeads(result);
     setCurrentPage(1);
   }, [leads, searchTerm, statusFilter, calendarDate, sortConfig]);
@@ -205,15 +283,17 @@ export default function NRI1502() {
   const handlePushLead = async (leadId) => {
     try {
       setPushingLeadId(leadId);
-      const leadRef = doc(db, "dom-bangali-01", leadId);
+      const leadRef = doc(db, "nri-1504", leadId);
       
+      // Check current status
       const leadDoc = await getDoc(leadRef);
       const currentStatus = leadDoc.data()?.status;
       
+      // Only update if not already pushed
       if (currentStatus !== "pushed") {
         await updateDoc(leadRef, {
           status: "pushed",
-          pushedAt: new Date(),
+          pushedAt: new Date().toISOString(),
         });
       }
     } catch (error) {
@@ -232,7 +312,7 @@ export default function NRI1502() {
 
     try {
       setMarkingDuplicateId(leadId);
-      const leadRef = doc(db, "dom-bangali-01", leadId);
+      const leadRef = doc(db, "nri-1504", leadId);
       
       const leadDoc = await getDoc(leadRef);
       const currentStatus = leadDoc.data()?.status;
@@ -240,8 +320,8 @@ export default function NRI1502() {
       if (currentStatus !== "duplicate") {
         await updateDoc(leadRef, {
           status: "duplicate",
-          duplicateMarkedAt: new Date(),
-          duplicateMarkedBy: "admin", // You can change this to dynamic user
+          duplicateMarkedAt: new Date().toISOString(),
+          duplicateMarkedBy: "admin",
         });
         alert("Lead marked as duplicate successfully!");
       }
@@ -258,13 +338,14 @@ export default function NRI1502() {
     const worksheetData = filteredLeads.map((lead) => ({
       ID: lead.id,
       Name: lead.name || "",
-      "First Name": lead.firstName || "",
       Phone: lead.phone || "",
+      "Full Phone Number": lead.fullPhoneNumber || "",
       Email: lead.email || "",
       Age: lead.age || "",
       "Year of Birth": lead.year_of_birth || "",
       Income: lead.income || "",
       "Country Code": lead.countryCode || "",
+      Campaign: lead.campaign || "",
       Status: lead.status || "new",
       "Submitted At (IST)": lead.submittedAt ? 
         convertUTCtoIST(lead.submittedAt.toDate()).toLocaleString('en-IN', {
@@ -272,8 +353,13 @@ export default function NRI1502() {
           dateStyle: 'medium',
           timeStyle: 'medium'
         }) : "",
-      "Pushed At": lead.pushedAt ? lead.pushedAt.toDate().toLocaleString() : "",
-      "Duplicate Marked At": lead.duplicateMarkedAt ? 
+      "Pushed At (IST)": lead.pushedAt ? 
+        convertUTCtoIST(lead.pushedAt.toDate()).toLocaleString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          dateStyle: 'medium',
+          timeStyle: 'medium'
+        }) : "",
+      "Duplicate Marked At (IST)": lead.duplicateMarkedAt ? 
         convertUTCtoIST(lead.duplicateMarkedAt.toDate()).toLocaleString('en-IN', {
           timeZone: 'Asia/Kolkata',
           dateStyle: 'medium',
@@ -284,11 +370,17 @@ export default function NRI1502() {
       Language: lead.language || "",
       Source: lead.source || "",
       Notes: lead.notes || "",
+      "Verified At": lead.verifiedAt || "",
+      Timestamp: lead.timestamp || "",
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(worksheetData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Leads");
+
+    // Auto-size columns
+    const maxWidth = worksheetData.reduce((w, r) => Math.max(w, r.Name.length), 10);
+    worksheet["!cols"] = [{ wch: maxWidth + 2 }];
 
     const excelBuffer = XLSX.write(workbook, {
       bookType: "xlsx",
@@ -296,7 +388,7 @@ export default function NRI1502() {
     });
     const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
 
-    const filename = `dom-bangali-01-Leads-${new Date().toISOString().split("T")[0]}.xlsx`;
+    const filename = `NRI-1504-Leads-${new Date().toISOString().split("T")[0]}.xlsx`;
     saveAs(blob, filename);
   };
 
@@ -311,13 +403,22 @@ export default function NRI1502() {
     setSearchTerm("");
     setStatusFilter("all");
     setCalendarDate("");
-    setSortConfig({ key: "timestamp", direction: "desc" });
+    setSortConfig({ key: "submittedAt", direction: "desc" });
+  };
+
+  // Get current date in IST for date picker max
+  const getTodayIST = () => {
+    const now = new Date();
+    const istDate = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    return istDate.toISOString().split('T')[0];
   };
 
   // Format date for display in IST
   const formatISTDate = (date) => {
     if (!date) return "";
     const istDate = convertUTCtoIST(date);
+    if (!istDate) return "";
+    
     return istDate.toLocaleDateString('en-IN', {
       weekday: 'short',
       year: 'numeric',
@@ -327,12 +428,41 @@ export default function NRI1502() {
     });
   };
 
-  // Get current date in IST for date picker max
-  const getTodayIST = () => {
-    const now = new Date();
-    const istDate = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
-    return istDate.toISOString().split('T')[0];
+  // Format date for table display in IST
+  const formatTableDate = (timestamp) => {
+    if (!timestamp) return "N/A";
+    
+    let date;
+    if (typeof timestamp === 'string') {
+      date = new Date(timestamp);
+    } else if (timestamp && typeof timestamp.toDate === 'function') {
+      date = timestamp.toDate();
+    } else if (timestamp instanceof Date) {
+      date = timestamp;
+    } else {
+      return "N/A";
+    }
+    
+    if (isNaN(date.getTime())) {
+      return "N/A";
+    }
+    
+    const istDate = convertUTCtoIST(date);
+    if (!istDate) return "N/A";
+    
+    return istDate.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata'
+    });
   };
+
+  // Calculate pagination
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredLeads.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
 
   // Get status badge color
   const getStatusColor = (status) => {
@@ -346,25 +476,6 @@ export default function NRI1502() {
       default:
         return "bg-gray-100 text-gray-800 border border-gray-200";
     }
-  };
-
-  // Calculate pagination
-const indexOfLastItem = currentPage * itemsPerPage;
-const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-const currentItems = filteredLeads.slice(indexOfFirstItem, indexOfLastItem);
-const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
-
-  // Format date for table display in IST
-  const formatTableDate = (timestamp) => {
-    if (!timestamp) return "N/A";
-    const date = timestamp.toDate();
-    const istDate = convertUTCtoIST(date);
-    return istDate.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'Asia/Kolkata'
-    });
   };
 
   if (loading) {
@@ -394,19 +505,18 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
-                <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                <BreadcrumbPage>NRI 1504 Leads</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
         </header>
-        
         <div className="min-h-screen bg-gray-50 p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Domestic Bangali Leads</h1>
+                  <h1 className="text-3xl font-bold text-gray-900">NRI 1504 Leads</h1>
                   <p className="text-gray-600 mt-2">
                     Total: <span className="font-semibold">{filteredLeads.length}</span> leads | 
                     Pushed: <span className="font-semibold text-blue-600">
@@ -511,7 +621,7 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                     onChange={(e) => handleSort(e.target.value)}
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                   >
-                    <option value="timestamp">Date (Newest)</option>
+                    <option value="submittedAt">Date (Newest)</option>
                     <option value="name">Name</option>
                     <option value="age">Age</option>
                     <option value="income">Income</option>
@@ -572,26 +682,63 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Name
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => handleSort("name")}
+                      >
+                        <div className="flex items-center gap-1">
+                          Name
+                          {sortConfig.key === "name" && (
+                            <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
+                          )}
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Phone
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => handleSort("phone")}
+                      >
+                        <div className="flex items-center gap-1">
+                          Phone
+                          {sortConfig.key === "phone" && (
+                            <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
+                          )}
+                        </div>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Email
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Age
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => handleSort("age")}
+                      >
+                        <div className="flex items-center gap-1">
+                          Age
+                          {sortConfig.key === "age" && (
+                            <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
+                          )}
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Income
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => handleSort("income")}
+                      >
+                        <div className="flex items-center gap-1">
+                          Income
+                          {sortConfig.key === "income" && (
+                            <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
+                          )}
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        City
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date (IST)
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => handleSort("submittedAt")}
+                      >
+                        <div className="flex items-center gap-1">
+                          Date (IST)
+                          {sortConfig.key === "submittedAt" && (
+                            <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
+                          )}
+                        </div>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
@@ -612,44 +759,53 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                           className="hover:bg-gray-50 transition-colors"
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="font-medium text-gray-900">{lead.name || lead.firstName || "N/A"}</div>
-                            <div className="text-sm text-gray-500">ID: {lead.id.substring(0, 8)}...</div>
+                            <div className="flex items-center">
+                              <div>
+                                <div className="font-medium text-gray-900">{lead.name || "N/A"}</div>
+                                <div className="text-sm text-gray-500">ID: {lead.id ? lead.id.substring(0, 8) + "..." : "N/A"}</div>
+                              </div>
+                            </div>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="font-medium">{lead.phone || "N/A"}</div>
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <div className="font-medium">{lead.fullPhoneNumber || lead.phone || "N/A"}</div>
+                                <div className="text-sm text-gray-500">{lead.countryCode || "N/A"}</div>
+                              </div>
+                            </div>
                           </td>
                           <td className="px-6 py-4">
-                            <a
-                              href={`mailto:${lead.email}`}
-                              className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-2"
-                            >
-                              <Mail className="h-4 w-4" />
-                              {lead.email || "N/A"}
-                            </a>
+                            {lead.email ? (
+                              <a
+                                href={`mailto:${lead.email}`}
+                                className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-2"
+                              >
+                                <Mail className="h-4 w-4" />
+                                {lead.email}
+                              </a>
+                            ) : (
+                              <span className="text-gray-500">N/A</span>
+                            )}
                           </td>
                           <td className="px-6 py-4">
-                            <div className="font-medium">{lead.age || "N/A"}</div>
+                            <div className="flex items-center gap-2">
+                              <div className="font-medium">{lead.age || "N/A"}</div>
+                              <div className="text-sm text-gray-500">
+                                ({lead.year_of_birth || "N/A"})
+                              </div>
+                            </div>
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <DollarSign className="h-4 w-4 text-green-600" />
-                              <span className="font-medium">
-                                {lead.income === "below_3" ? "Below 3 lakh" : 
-                                 lead.income === "3_5" ? "3 lakh - 5 lakh" :
-                                 lead.income === "5_10" ? "5 lakh - 10 lakh" :
-                                 lead.income === "10_15" ? "10 lakh - 15 lakh" :
-                                 lead.income === "above_15" ? "Above 15 lakh" : lead.income || "N/A"}
-                              </span>
+                              <span className="font-medium">{lead.income || "N/A"}</span>
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="font-medium">{lead.city || "N/A"}</div>
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-gray-400" />
                               <span className="text-sm">
-                                {formatTableDate(lead.submittedAt)}
+                                {formatTableDate(lead.timestamp || lead.submittedAt)}
                               </span>
                             </div>
                           </td>
@@ -677,17 +833,20 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                                 <button
                                   onClick={() => handleMarkAsDuplicate(lead.id)}
                                   disabled={lead.status === "duplicate" || markingDuplicateId === lead.id}
-                                  className={`p-2 rounded-lg transition-colors flex items-center gap-1 ${
+                                  className={`p-2 rounded-lg transition-colors flex items-center gap-1 text-sm ${
                                     lead.status === "duplicate"
-                                      ? "bg-orange-100 text-orange-700 cursor-default"
-                                      : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                                      ? "bg-orange-100 text-orange-700 cursor-default px-3"
+                                      : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 px-3"
                                   }`}
                                   title={lead.status === "duplicate" ? "Already Marked as Duplicate" : "Mark as Duplicate"}
                                 >
                                   {markingDuplicateId === lead.id ? (
                                     <RefreshCw className="h-4 w-4 animate-spin" />
                                   ) : lead.status === "duplicate" ? (
-                                    <AlertCircle className="h-4 w-4" />
+                                    <>
+                                      <AlertCircle className="h-4 w-4" />
+                                      Duplicate
+                                    </>
                                   ) : (
                                     <>
                                       <Copy className="h-4 w-4" />
@@ -700,7 +859,7 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                                 <button
                                   onClick={() => handlePushLead(lead.id)}
                                   disabled={lead.status === "pushed" || pushingLeadId === lead.id || lead.status === "duplicate"}
-                                  className={`p-2 rounded-lg transition-colors ${
+                                  className={`p-2 rounded-lg transition-colors text-sm px-3 ${
                                     lead.status === "pushed"
                                       ? "bg-green-100 text-green-700 cursor-default"
                                       : lead.status === "duplicate"
@@ -716,7 +875,10 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                                   {pushingLeadId === lead.id ? (
                                     <RefreshCw className="h-4 w-4 animate-spin" />
                                   ) : lead.status === "pushed" ? (
-                                    <CheckCircle className="h-4 w-4" />
+                                    <>
+                                      <CheckCircle className="h-4 w-4" />
+                                      Pushed
+                                    </>
                                   ) : lead.status === "duplicate" ? (
                                     "X"
                                   ) : (
@@ -739,7 +901,9 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                     </div>
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No leads found</h3>
                     <p className="text-gray-500">
-                      Try adjusting your search or filter to find what you're looking for.
+                      {calendarDate 
+                        ? `No leads submitted on ${formatISTDate(new Date(calendarDate + 'T00:00:00Z'))}. Try another date or remove the date filter.`
+                        : "Try adjusting your search or filter to find what you're looking for."}
                     </p>
                   </div>
                 )}
@@ -819,9 +983,7 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                     <div>
                       <h2 className="text-2xl font-bold text-gray-900">Lead Details</h2>
                       <p className="text-gray-600 mt-1">
-                        {selectedLead.submittedAt ? 
-                          `Submitted on ${formatISTDate(selectedLead.submittedAt.toDate())}` : 
-                          "Date not available"}
+                        Submitted on {formatTableDate(selectedLead.timestamp || selectedLead.submittedAt)}
                       </p>
                     </div>
                     <button
@@ -844,7 +1006,7 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                       <div className="space-y-3">
                         <div>
                           <label className="text-sm font-medium text-gray-500">Name</label>
-                          <p className="mt-1 text-gray-900">{selectedLead.name || selectedLead.firstName || "N/A"}</p>
+                          <p className="mt-1 text-gray-900">{selectedLead.name || "N/A"}</p>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-500">Age</label>
@@ -866,20 +1028,25 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                       <div className="space-y-3">
                         <div>
                           <label className="text-sm font-medium text-gray-500">Phone</label>
-                          <p className="mt-1 text-gray-900">
+                          <p className="mt-1 text-gray-900 flex items-center gap-2">
+                            <Globe className="h-4 w-4 text-gray-400" />
                             {selectedLead.countryCode ? `${selectedLead.countryCode} ` : ""}
-                            {selectedLead.phone || "N/A"}
+                            {selectedLead.fullPhoneNumber || selectedLead.phone || "N/A"}
                           </p>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-500">Email</label>
-                          <a
-                            href={`mailto:${selectedLead.email}`}
-                            className="mt-1 text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-2"
-                          >
-                            <Mail className="h-4 w-4" />
-                            {selectedLead.email || "N/A"}
-                          </a>
+                          {selectedLead.email ? (
+                            <a
+                              href={`mailto:${selectedLead.email}`}
+                              className="mt-1 text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-2"
+                            >
+                              <Mail className="h-4 w-4" />
+                              {selectedLead.email}
+                            </a>
+                          ) : (
+                            <p className="mt-1 text-gray-500">N/A</p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -893,13 +1060,11 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                       <div className="space-y-3">
                         <div>
                           <label className="text-sm font-medium text-gray-500">Income</label>
-                          <p className="mt-1 text-gray-900">
-                            {selectedLead.income === "below_3" ? "Below 3 lakh" : 
-                             selectedLead.income === "3_5" ? "3 lakh - 5 lakh" :
-                             selectedLead.income === "5_10" ? "5 lakh - 10 lakh" :
-                             selectedLead.income === "10_15" ? "10 lakh - 15 lakh" :
-                             selectedLead.income === "above_15" ? "Above 15 lakh" : selectedLead.income || "N/A"}
-                          </p>
+                          <p className="mt-1 text-gray-900">{selectedLead.income || "N/A"}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">Campaign</label>
+                          <p className="mt-1 text-gray-900">{selectedLead.campaign || "N/A"}</p>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-500">Status</label>
@@ -924,16 +1089,18 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                       </h3>
                       <div className="space-y-3">
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Source</label>
-                          <p className="mt-1 text-gray-900">{selectedLead.source || "N/A"}</p>
-                        </div>
-                        <div>
                           <label className="text-sm font-medium text-gray-500">Language</label>
                           <p className="mt-1 text-gray-900">{selectedLead.language || "English"}</p>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-500">IP Address</label>
                           <p className="mt-1 text-gray-900">{selectedLead.ipAddress || "N/A"}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">Source</label>
+                          <p className="mt-1 text-gray-900 text-sm truncate">
+                            {selectedLead.source || "N/A"}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -948,6 +1115,20 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                     </div>
                   )}
 
+                  {selectedLead.verifiedAt && (
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                        Verification
+                      </h3>
+                      <div className="bg-green-50 rounded-lg p-4">
+                        <p className="text-green-700">
+                          Verified at: {selectedLead.verifiedAt}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {selectedLead.duplicateMarkedAt && (
                     <div className="mt-6 pt-6 border-t border-gray-200">
                       <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -956,7 +1137,7 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                       </h3>
                       <div className="bg-orange-50 rounded-lg p-4">
                         <p className="text-orange-700">
-                          Marked as duplicate on {formatISTDate(selectedLead.duplicateMarkedAt?.toDate())}
+                          Marked as duplicate on {formatTableDate(selectedLead.duplicateMarkedAt)}
                           {selectedLead.duplicateMarkedBy && ` by ${selectedLead.duplicateMarkedBy}`}
                         </p>
                       </div>
