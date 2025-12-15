@@ -81,11 +81,11 @@ const data = {
           url: "/dom-mal-01",
         },
         {
-          title: "Marathi",
+          title: "Marathi 1508",
           url: "/dom-mar-01",
         },
         {
-          title: "Punjabi",
+          title: "Punjabi 1512",
           url: "/dom-pun-01",
         },
         {
