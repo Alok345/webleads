@@ -53,7 +53,7 @@ export default function NRI1502() {
   const [pushingLeadId, setPushingLeadId] = useState(null);
   const [markingDuplicateId, setMarkingDuplicateId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(30);
+  const [itemsPerPage] = useState(100);
   const [sortConfig, setSortConfig] = useState({
     key: "submittedAt",
     direction: "desc",
@@ -64,7 +64,7 @@ export default function NRI1502() {
     if (!date) return null;
     const utcDate = new Date(date);
     // IST is UTC+5:30
-    return new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+    return new Date(utcDate.getTime() );
   };
 
   // Function to get IST date string (YYYY-MM-DD format)
@@ -124,9 +124,19 @@ export default function NRI1502() {
     }
 
     // Apply status filter
-    if (statusFilter !== "all") {
-      result = result.filter((lead) => lead.status === statusFilter);
-    }
+    // if (statusFilter !== "all") {
+    //   result = result.filter((lead) => lead.status === statusFilter);
+    // }
+
+    // Apply status filter
+if (statusFilter !== "all") {
+  if (statusFilter === "new") {
+    // Include both "new" status and undefined/null status
+    result = result.filter((lead) => !lead.status || lead.status === "new");
+  } else {
+    result = result.filter((lead) => lead.status === statusFilter);
+  }
+}
 
     // Apply date filter using IST
     if (calendarDate) {
@@ -307,7 +317,7 @@ export default function NRI1502() {
   // Get current date in IST for date picker max
   const getTodayIST = () => {
     const now = new Date();
-    const istDate = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const istDate = new Date(now.getTime() );
     return istDate.toISOString().split('T')[0];
   };
 
@@ -525,7 +535,7 @@ export default function NRI1502() {
                     const today = new Date();
                     const yesterday = new Date(today);
                     yesterday.setDate(yesterday.getDate() - 1);
-                    const istYesterday = new Date(yesterday.getTime() + (5.5 * 60 * 60 * 1000));
+                    const istYesterday = new Date(yesterday.getTime() );
                     setCalendarDate(istYesterday.toISOString().split('T')[0]);
                   }}
                   className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
@@ -533,7 +543,7 @@ export default function NRI1502() {
                       const today = new Date();
                       const yesterday = new Date(today);
                       yesterday.setDate(yesterday.getDate() - 1);
-                      const istYesterday = new Date(yesterday.getTime() + (5.5 * 60 * 60 * 1000));
+                      const istYesterday = new Date(yesterday.getTime() );
                       return istYesterday.toISOString().split('T')[0];
                     })()
                       ? 'bg-blue-600 text-white'
