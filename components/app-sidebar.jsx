@@ -58,6 +58,10 @@ const data = {
           title: "Health NRI 2",
           url: "/health-nri-2",
         },
+        {
+          title: "Health NRI 3",
+          url: "/health-nri-3",
+        },
       ],
     },
     {
