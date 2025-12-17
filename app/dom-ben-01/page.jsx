@@ -39,6 +39,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { bnToEn } from "@/utils/bnToEn"
 
 export default function NRI1502() {
   const [leads, setLeads] = useState([]);
@@ -59,6 +60,12 @@ export default function NRI1502() {
     direction: "desc",
   });
   const [calendarDate, setCalendarDate] = useState("");
+
+
+//   const bnToEn = (text) => {
+//   if (!text) return "N/A"
+//   return transliterate(text, "bn", "en")
+// }
 
   // Function to convert UTC to IST
   const convertUTCtoIST = (date) => {
@@ -642,9 +649,12 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                               </span>
                             </div>
                           </td>
-                          <td className="px-6 py-4">
-                            <div className="font-medium">{lead.city || "N/A"}</div>
-                          </td>
+                        <td className="px-6 py-4">
+  <div className="font-medium">
+    {bnToEn(lead.district)}
+  </div>
+</td>
+
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-gray-400" />
