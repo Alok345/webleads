@@ -44,6 +44,12 @@ const data = {
           title: "NRI 1504",
           url: "/nri-1504",
         },
+        {
+          title: "NRI 1505",
+          url: "/nri-1505",
+        }
+        
+        
       ],
     },
     {
