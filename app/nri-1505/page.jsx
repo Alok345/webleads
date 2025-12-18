@@ -115,79 +115,54 @@ export default function NRI1502() {
 
   // Fetch leads from Firestore - Updated to handle string timestamps
   useEffect(() => {
-    const q = query(collection(db, "nri-1505"), orderBy("timestamp", "desc"));
-    
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const leadsData = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        
-        // Normalize the data structure
-        const normalizedData = {
-          id: doc.id,
-          name: data.name || "",
-          email: data.email || "",
-          phone: data.phone || "",
-          fullPhoneNumber: data.fullPhoneNumber || data.phone || "",
-          countryCode: data.countryCode || "",
-          age: data.age || "",
-          year_of_birth: data.year_of_birth || data.year || "",
-          income: data.income || "",
-          campaign: data.campaign || "",
-          status: data.status || "new",
-          language: data.language || "English",
-          ipAddress: data.ipAddress || "",
-          source: data.source || "",
-          notes: data.notes || "",
-          verifiedAt: data.verifiedAt || "",
-          // Handle timestamps - create a consistent interface
-          timestamp: data.timestamp || "",
-          submittedAt: {
-            toDate: () => {
-              if (data.timestamp) {
-                return new Date(data.timestamp);
-              } else if (data.submittedAt) {
-                if (typeof data.submittedAt.toDate === 'function') {
-                  return data.submittedAt.toDate();
-                } else if (typeof data.submittedAt === 'string') {
-                  return new Date(data.submittedAt);
-                }
-              }
-              return new Date();
-            }
-          },
-          pushedAt: data.pushedAt ? {
-            toDate: () => {
-              if (typeof data.pushedAt.toDate === 'function') {
-                return data.pushedAt.toDate();
-              } else if (typeof data.pushedAt === 'string') {
-                return new Date(data.pushedAt);
-              }
-              return new Date(data.pushedAt);
-            }
-          } : null,
-          duplicateMarkedAt: data.duplicateMarkedAt ? {
-            toDate: () => {
-              if (typeof data.duplicateMarkedAt.toDate === 'function') {
-                return data.duplicateMarkedAt.toDate();
-              } else if (typeof data.duplicateMarkedAt === 'string') {
-                return new Date(data.duplicateMarkedAt);
-              }
-              return new Date(data.duplicateMarkedAt);
-            }
-          } : null,
-          duplicateMarkedBy: data.duplicateMarkedBy || ""
-        };
-        
-        leadsData.push(normalizedData);
-      });
-      setLeads(leadsData);
-      setFilteredLeads(leadsData);
-      setLoading(false);
+  // Use the correct collection name and order by the correct field
+  const q = query(collection(db, "nri-1505"), orderBy("submittedAt", "desc"));
+  
+  const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const leadsData = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      
+      // Normalize the data structure with correct field mapping
+      const normalizedData = {
+        id: doc.id,
+        name: data.name || "",
+        email: data.email || "",
+        phone: data.phone || "",
+        fullPhone: data.fullPhone || "",
+        fullPhoneNumber: data.fullPhone || data.phone || "",
+        countryCode: data.countryCode || "",
+        age: data.age || "",
+        year_of_birth: data.yearOfBirth || data.year_of_birth || "", // Use yearOfBirth from Firestore
+        income: data.income || "",
+        campaign: data.campaign || "",
+        status: data.status || "new",
+        language: data.language || "English",
+        ipAddress: data.ipAddress || "",
+        source: data.source || "",
+        notes: data.notes || "",
+        verifiedAt: data.verifiedAt || "",
+        submittedAt: data.submittedAt || null,
+        timestamp: data.submittedAt || null, // Map to submittedAt
+        pushedAt: data.pushedAt || null,
+        duplicateMarkedAt: data.duplicateMarkedAt || null,
+        duplicateMarkedBy: data.duplicateMarkedBy || "",
+      };
+      
+      leadsData.push(normalizedData);
     });
+    setLeads(leadsData);
+    setFilteredLeads(leadsData);
+    setLoading(false);
+    
+    // Debug: Log the first lead to check data
+    if (leadsData.length > 0) {
+      console.log("First lead data:", leadsData[0]);
+    }
+  });
 
-    return () => unsubscribe();
-  }, []);
+  return () => unsubscribe();
+}, []);
 
   // Apply filters and search
   useEffect(() => {
@@ -200,7 +175,7 @@ export default function NRI1502() {
         (lead) =>
           lead.name?.toLowerCase().includes(term) ||
           lead.phone?.toLowerCase().includes(term) ||
-          lead.fullPhoneNumber?.toLowerCase().includes(term) ||
+          lead.fullPhone?.toLowerCase().includes(term) ||
           lead.email?.toLowerCase().includes(term) ||
           lead.id?.toLowerCase().includes(term)
       );
@@ -280,58 +255,88 @@ export default function NRI1502() {
   };
 
   // Push lead status
-  const handlePushLead = async (leadId) => {
-    try {
-      setPushingLeadId(leadId);
-      const leadRef = doc(db, "nri-1505", leadId);
-      
-      // Check current status
-      const leadDoc = await getDoc(leadRef);
-      const currentStatus = leadDoc.data()?.status;
-      
-      // Only update if not already pushed
-      if (currentStatus !== "pushed") {
-        await updateDoc(leadRef, {
-          status: "pushed",
-          pushedAt: new Date().toISOString(),
-        });
-      }
-    } catch (error) {
-      console.error("Error pushing lead:", error);
-      alert("Error updating lead status");
-    } finally {
-      setPushingLeadId(null);
+  // Push lead status
+const handlePushLead = async (leadId) => {
+  try {
+    setPushingLeadId(leadId);
+    const leadRef = doc(db, "nri-1505", leadId); // Already correct
+    
+    // Check current status
+    const leadDoc = await getDoc(leadRef);
+    const currentStatus = leadDoc.data()?.status;
+    
+    // Only update if not already pushed
+    if (currentStatus !== "pushed") {
+      await updateDoc(leadRef, {
+        status: "pushed",
+        pushedAt: new Date().toISOString(),
+      });
     }
-  };
+  } catch (error) {
+    console.error("Error pushing lead:", error);
+    alert("Error updating lead status");
+  } finally {
+    setPushingLeadId(null);
+  }
+};
+
+// Mark as duplicate
+const handleMarkAsDuplicate = async (leadId) => {
+  if (!window.confirm("Are you sure you want to mark this lead as duplicate?")) {
+    return;
+  }
+
+  try {
+    setMarkingDuplicateId(leadId);
+    const leadRef = doc(db, "nri-1505", leadId); // Already correct
+    
+    const leadDoc = await getDoc(leadRef);
+    const currentStatus = leadDoc.data()?.status;
+    
+    if (currentStatus !== "duplicate") {
+      await updateDoc(leadRef, {
+        status: "duplicate",
+        duplicateMarkedAt: new Date().toISOString(),
+        duplicateMarkedBy: "admin",
+      });
+      alert("Lead marked as duplicate successfully!");
+    }
+  } catch (error) {
+    console.error("Error marking lead as duplicate:", error);
+    alert("Error marking lead as duplicate");
+  } finally {
+    setMarkingDuplicateId(null);
+  }
+};
 
   // Mark as duplicate
-  const handleMarkAsDuplicate = async (leadId) => {
-    if (!window.confirm("Are you sure you want to mark this lead as duplicate?")) {
-      return;
-    }
+//   const handleMarkAsDuplicate = async (leadId) => {
+//     if (!window.confirm("Are you sure you want to mark this lead as duplicate?")) {
+//       return;
+//     }
 
-    try {
-      setMarkingDuplicateId(leadId);
-      const leadRef = doc(db, "nri-1505", leadId);
+//     try {
+//       setMarkingDuplicateId(leadId);
+//       const leadRef = doc(db, "nri-1505", leadId);
       
-      const leadDoc = await getDoc(leadRef);
-      const currentStatus = leadDoc.data()?.status;
+//       const leadDoc = await getDoc(leadRef);
+//       const currentStatus = leadDoc.data()?.status;
       
-      if (currentStatus !== "duplicate") {
-        await updateDoc(leadRef, {
-          status: "duplicate",
-          duplicateMarkedAt: new Date().toISOString(),
-          duplicateMarkedBy: "admin",
-        });
-        alert("Lead marked as duplicate successfully!");
-      }
-    } catch (error) {
-      console.error("Error marking lead as duplicate:", error);
-      alert("Error marking lead as duplicate");
-    } finally {
-      setMarkingDuplicateId(null);
-    }
-  };
+//       if (currentStatus !== "duplicate") {
+//         await updateDoc(leadRef, {
+//           status: "duplicate",
+//           duplicateMarkedAt: new Date().toISOString(),
+//           duplicateMarkedBy: "admin",
+//         });
+//         alert("Lead marked as duplicate successfully!");
+//       }
+//     } catch (error) {
+//       console.error("Error marking lead as duplicate:", error);
+//       alert("Error marking lead as duplicate");
+//     } finally {
+//       setMarkingDuplicateId(null);
+//     }
+//   };
 
   // Download to Excel
   const handleDownloadExcel = () => {
@@ -339,7 +344,7 @@ export default function NRI1502() {
       ID: lead.id,
       Name: lead.name || "",
       Phone: lead.phone || "",
-      "Full Phone Number": lead.fullPhoneNumber || "",
+      "Full Phone Number": lead.fullPhone || "",
       Email: lead.email || "",
       Age: lead.age || "",
       "Year of Birth": lead.year_of_birth || "",
@@ -516,7 +521,7 @@ export default function NRI1502() {
             <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">NRI 1504 Leads</h1>
+                  <h1 className="text-3xl font-bold text-gray-900">NRI 1505 Leads</h1>
                   <p className="text-gray-600 mt-2">
                     Total: <span className="font-semibold">{filteredLeads.length}</span> leads | 
                     Pushed: <span className="font-semibold text-blue-600">
@@ -769,7 +774,7 @@ export default function NRI1502() {
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <div>
-                                <div className="font-medium">{lead.fullPhoneNumber || lead.phone || "N/A"}</div>
+                                <div className="font-medium">{lead.fullPhone || lead.phone || "N/A"}</div>
                                 <div className="text-sm text-gray-500">{lead.countryCode || "N/A"}</div>
                               </div>
                             </div>
@@ -791,7 +796,7 @@ export default function NRI1502() {
                             <div className="flex items-center gap-2">
                               <div className="font-medium">{lead.age || "N/A"}</div>
                               <div className="text-sm text-gray-500">
-                                ({lead.year_of_birth || "N/A"})
+                                ({lead.year || "N/A"})
                               </div>
                             </div>
                           </td>
@@ -1031,7 +1036,7 @@ export default function NRI1502() {
                           <p className="mt-1 text-gray-900 flex items-center gap-2">
                             <Globe className="h-4 w-4 text-gray-400" />
                             {selectedLead.countryCode ? `${selectedLead.countryCode} ` : ""}
-                            {selectedLead.fullPhoneNumber || selectedLead.phone || "N/A"}
+                            {selectedLead.fullPhone || selectedLead.phone || "N/A"}
                           </p>
                         </div>
                         <div>
