@@ -74,18 +74,18 @@ const data = {
       title: "Domestic Leads",
       type: "dropdown",
       items: [
-        {
-          title: "Gujarat 1509",
-          url: "/dom-guj-01",
-        },
+        // {
+        //   title: "Gujarat 1509",
+        //   url: "/dom-guj-01",
+        // },
         {
           title: "English 1503",
           url: "/dom-eng-01",
         },
-        {
-          title: "Hindi 1504",
-          url: "/dom-hin-01",
-        },
+        // {
+        //   title: "Hindi 1504",
+        //   url: "/dom-hin-01",
+        // },
         {
           title: "Malayalam",
           url: "/dom-mal-01",

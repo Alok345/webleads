@@ -11,6 +11,7 @@ import {
   doc,
   updateDoc,
   getDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -71,13 +72,21 @@ export default function NRI1502() {
     key: "submittedAt",
     direction: "desc",
   });
-
-  const handleMarkAsJunk = (leadId) => {
-    setLeads((prevLeads) =>
-      prevLeads.map((lead) =>
-        lead.id === leadId ? { ...lead, status: "junk" } : lead
-      )
-    );
+const [junkingLeadId, setJunkingLeadId] = useState(null);
+  const handleMarkAsJunk = async (leadId) => {
+    try {
+      setJunkingLeadId(leadId);
+  
+      await updateDoc(doc(db, "nri-1502", leadId), {
+        status: "junk",
+        junkAt: serverTimestamp(),
+      });
+  
+    } catch (error) {
+      console.error("Error marking lead as junk:", error);
+    } finally {
+      setJunkingLeadId(null);
+    }
   };
 
   // Function to convert UTC to IST
@@ -456,6 +465,10 @@ export default function NRI1502() {
                     <span className="font-semibold text-orange-600">
                       {leads.filter((l) => l.status === "duplicate").length}
                     </span>
+                      | Junk:{" "}
+                    <span className="font-semibold text-pink-600">
+                      {leads.filter((l) => l.status === "junk").length}
+                    </span>
                     {calendarDate && (
                       <span className="ml-4 text-blue-600">
                         | Showing:{" "}
@@ -514,6 +527,7 @@ export default function NRI1502() {
                     <option value="new">New</option>
                     <option value="pushed">Pushed</option>
                     <option value="duplicate">Duplicate</option>
+                    <option value="junk">Junk</option>
                   </select>
                 </div>
 

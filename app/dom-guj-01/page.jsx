@@ -439,6 +439,9 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                     Duplicate: <span className="font-semibold text-orange-600">
                       {leads.filter((l) => l.status === "duplicate").length}
                     </span>
+                    | Junk: <span className="font-semibold text-pink-600">
+                      {leads.filter((l) => l.status === "junk").length}
+                    </span>
                     {calendarDate && (
                       <span className="ml-4 text-blue-600">
                         | Showing: {formatISTDate(new Date(calendarDate + 'T00:00:00Z'))}
@@ -483,7 +486,7 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                   </div>
                 </div>
 
-                <div>
+                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Status
                   </label>
@@ -496,6 +499,7 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                     <option value="new">New</option>
                     <option value="pushed">Pushed</option>
                     <option value="duplicate">Duplicate</option>
+                    <option value="junk">Junk</option>
                   </select>
                 </div>
 
