@@ -28,10 +28,10 @@ const data = {
       title: "NRI Leads",
       type: "dropdown",
       items: [
-        {
-          title: "NRI 1501",
-          url: "/nri-1501",
-        },
+        // {
+        //   title: "NRI 1501",
+        //   url: "/nri-1501",
+        // },
         {
           title: "NRI 1502",
           url: "/nri-1502",

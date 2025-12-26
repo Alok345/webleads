@@ -309,34 +309,7 @@ const handleMarkAsDuplicate = async (leadId) => {
   }
 };
 
-  // Mark as duplicate
-//   const handleMarkAsDuplicate = async (leadId) => {
-//     if (!window.confirm("Are you sure you want to mark this lead as duplicate?")) {
-//       return;
-//     }
-
-//     try {
-//       setMarkingDuplicateId(leadId);
-//       const leadRef = doc(db, "nri-1505", leadId);
-      
-//       const leadDoc = await getDoc(leadRef);
-//       const currentStatus = leadDoc.data()?.status;
-      
-//       if (currentStatus !== "duplicate") {
-//         await updateDoc(leadRef, {
-//           status: "duplicate",
-//           duplicateMarkedAt: new Date().toISOString(),
-//           duplicateMarkedBy: "admin",
-//         });
-//         alert("Lead marked as duplicate successfully!");
-//       }
-//     } catch (error) {
-//       console.error("Error marking lead as duplicate:", error);
-//       alert("Error marking lead as duplicate");
-//     } finally {
-//       setMarkingDuplicateId(null);
-//     }
-//   };
+  
 
   // Download to Excel
   const handleDownloadExcel = () => {
@@ -478,8 +451,22 @@ const handleMarkAsDuplicate = async (leadId) => {
         return "bg-green-100 text-green-800 border border-green-200";
       case "duplicate":
         return "bg-orange-100 text-orange-800 border border-orange-200";
+      case "junk":
+        return "bg-pink-100 text-pink-800 border border-gray-200";
       default:
         return "bg-gray-100 text-gray-800 border border-gray-200";
+    }
+  };
+
+  const handleMarkAsJunk = async (leadId) => {
+    try {
+      if (!leadId) return;
+      await updateDoc(doc(db, "nri-1505", leadId), {
+        status: "junk",
+        junkAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Error marking lead as junk:", error);
     }
   };
 
@@ -824,75 +811,70 @@ const handleMarkAsDuplicate = async (leadId) => {
                             </span>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleViewLead(lead)}
-                                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                title="View Details"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </button>
-                              
-                              {lead.status === "pushed" ? (
-                                // Show Duplicate button for pushed leads
-                                <button
-                                  onClick={() => handleMarkAsDuplicate(lead.id)}
-                                  disabled={lead.status === "duplicate" || markingDuplicateId === lead.id}
-                                  className={`p-2 rounded-lg transition-colors flex items-center gap-1 text-sm ${
-                                    lead.status === "duplicate"
-                                      ? "bg-orange-100 text-orange-700 cursor-default px-3"
-                                      : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 px-3"
-                                  }`}
-                                  title={lead.status === "duplicate" ? "Already Marked as Duplicate" : "Mark as Duplicate"}
-                                >
-                                  {markingDuplicateId === lead.id ? (
-                                    <RefreshCw className="h-4 w-4 animate-spin" />
-                                  ) : lead.status === "duplicate" ? (
-                                    <>
-                                      <AlertCircle className="h-4 w-4" />
-                                      Duplicate
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy className="h-4 w-4" />
-                                      Duplicate
-                                    </>
-                                  )}
-                                </button>
-                              ) : (
-                                // Show Push button for non-pushed leads
-                                <button
-                                  onClick={() => handlePushLead(lead.id)}
-                                  disabled={lead.status === "pushed" || pushingLeadId === lead.id || lead.status === "duplicate"}
-                                  className={`p-2 rounded-lg transition-colors text-sm px-3 ${
-                                    lead.status === "pushed"
-                                      ? "bg-green-100 text-green-700 cursor-default"
-                                      : lead.status === "duplicate"
-                                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                      : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                  }`}
-                                  title={
-                                    lead.status === "pushed" ? "Already Pushed" :
-                                    lead.status === "duplicate" ? "Cannot push duplicate lead" :
-                                    "Push Lead"
-                                  }
-                                >
-                                  {pushingLeadId === lead.id ? (
-                                    <RefreshCw className="h-4 w-4 animate-spin" />
-                                  ) : lead.status === "pushed" ? (
-                                    <>
-                                      <CheckCircle className="h-4 w-4" />
-                                      Pushed
-                                    </>
-                                  ) : lead.status === "duplicate" ? (
-                                    "X"
-                                  ) : (
-                                    "Push"
-                                  )}
-                                </button>
-                              )}
-                            </div>
-                          </td>
+  <div className="flex gap-2">
+
+    {/* View (always visible) */}
+    <button
+      onClick={() => handleViewLead(lead)}
+      className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+      title="View Details"
+    >
+      <Eye className="h-4 w-4" />
+    </button>
+
+    {/* PUSH + JUNK (only when NOT pushed / junk / duplicate) */}
+    {!["pushed", "junk", "duplicate"].includes(lead.status) && (
+      <>
+        {/* Push */}
+        <button
+          onClick={() => handlePushLead(lead.id)}
+          disabled={pushingLeadId === lead.id}
+          className="p-2 rounded-lg transition-colors text-sm px-3
+                     bg-blue-100 text-blue-700 hover:bg-blue-200"
+          title="Push Lead"
+        >
+          {pushingLeadId === lead.id ? (
+            <RefreshCw className="h-4 w-4 animate-spin" />
+          ) : (
+            "Push"
+          )}
+        </button>
+
+        {/* Junk */}
+        <button
+          onClick={() => handleMarkAsJunk(lead.id)}
+          className="p-2 rounded-lg transition-colors text-sm px-3
+                     bg-gray-100 text-gray-600 hover:bg-gray-200"
+          title="Mark as Junk"
+        >
+          Junk
+        </button>
+      </>
+    )}
+
+    {/* DUPLICATE (only when pushed) */}
+    {lead.status === "pushed" && (
+      <button
+        onClick={() => handleMarkAsDuplicate(lead.id)}
+        disabled={markingDuplicateId === lead.id}
+        className="p-2 rounded-lg transition-colors flex items-center gap-1
+                   text-sm px-3 bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+        title="Mark as Duplicate"
+      >
+        {markingDuplicateId === lead.id ? (
+          <RefreshCw className="h-4 w-4 animate-spin" />
+        ) : (
+          <>
+            <Copy className="h-4 w-4" />
+            Duplicate
+          </>
+        )}
+      </button>
+    )}
+
+  </div>
+</td>
+
                         </motion.tr>
                       ))}
                     </AnimatePresence>

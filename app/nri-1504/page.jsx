@@ -11,6 +11,7 @@ import {
   doc,
   updateDoc,
   getDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -278,6 +279,30 @@ export default function NRI1502() {
       direction: prev.key === key && prev.direction === "desc" ? "asc" : "desc",
     }));
   };
+const [junkingLeadId, setJunkingLeadId] = useState(null);
+
+  const handleMarkAsJunk = async (leadId) => {
+  if (!leadId) return;
+
+  const confirmJunk = window.confirm(
+    "Are you sure you want to mark this lead as junk?"
+  );
+  if (!confirmJunk) return;
+
+  try {
+    setJunkingLeadId(leadId);
+
+    await updateDoc(doc(db, "nri-1504", leadId), {
+      status: "junk",
+      junkAt: serverTimestamp(),
+    });
+
+  } catch (error) {
+    console.error("Failed to mark lead as junk:", error);
+  } finally {
+    setJunkingLeadId(null);
+  }
+};
 
   // Push lead status
   const handlePushLead = async (leadId) => {
@@ -473,6 +498,8 @@ export default function NRI1502() {
         return "bg-green-100 text-green-800 border border-green-200";
       case "duplicate":
         return "bg-orange-100 text-orange-800 border border-orange-200";
+      case "junk":
+        return "bg-pink-100 text-pink-800 border border-gray-200";
       default:
         return "bg-gray-100 text-gray-800 border border-gray-200";
     }
@@ -819,75 +846,72 @@ export default function NRI1502() {
                             </span>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleViewLead(lead)}
-                                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                title="View Details"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </button>
-                              
-                              {lead.status === "pushed" ? (
-                                // Show Duplicate button for pushed leads
-                                <button
-                                  onClick={() => handleMarkAsDuplicate(lead.id)}
-                                  disabled={lead.status === "duplicate" || markingDuplicateId === lead.id}
-                                  className={`p-2 rounded-lg transition-colors flex items-center gap-1 text-sm ${
-                                    lead.status === "duplicate"
-                                      ? "bg-orange-100 text-orange-700 cursor-default px-3"
-                                      : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 px-3"
-                                  }`}
-                                  title={lead.status === "duplicate" ? "Already Marked as Duplicate" : "Mark as Duplicate"}
-                                >
-                                  {markingDuplicateId === lead.id ? (
-                                    <RefreshCw className="h-4 w-4 animate-spin" />
-                                  ) : lead.status === "duplicate" ? (
-                                    <>
-                                      <AlertCircle className="h-4 w-4" />
-                                      Duplicate
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy className="h-4 w-4" />
-                                      Duplicate
-                                    </>
-                                  )}
-                                </button>
-                              ) : (
-                                // Show Push button for non-pushed leads
-                                <button
-                                  onClick={() => handlePushLead(lead.id)}
-                                  disabled={lead.status === "pushed" || pushingLeadId === lead.id || lead.status === "duplicate"}
-                                  className={`p-2 rounded-lg transition-colors text-sm px-3 ${
-                                    lead.status === "pushed"
-                                      ? "bg-green-100 text-green-700 cursor-default"
-                                      : lead.status === "duplicate"
-                                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                      : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                  }`}
-                                  title={
-                                    lead.status === "pushed" ? "Already Pushed" :
-                                    lead.status === "duplicate" ? "Cannot push duplicate lead" :
-                                    "Push Lead"
-                                  }
-                                >
-                                  {pushingLeadId === lead.id ? (
-                                    <RefreshCw className="h-4 w-4 animate-spin" />
-                                  ) : lead.status === "pushed" ? (
-                                    <>
-                                      <CheckCircle className="h-4 w-4" />
-                                      Pushed
-                                    </>
-                                  ) : lead.status === "duplicate" ? (
-                                    "X"
-                                  ) : (
-                                    "Push"
-                                  )}
-                                </button>
-                              )}
-                            </div>
-                          </td>
+  <div className="flex gap-2">
+
+    {/* View (always visible) */}
+    <button
+      onClick={() => handleViewLead(lead)}
+      className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+      title="View Details"
+    >
+      <Eye className="h-4 w-4" />
+    </button>
+
+    {/* PUSH + JUNK (only when NOT pushed / junk / duplicate) */}
+    {lead.status !== "pushed" &&
+      lead.status !== "junk" &&
+      lead.status !== "duplicate" && (
+        <>
+          {/* Push */}
+          <button
+            onClick={() => handlePushLead(lead.id)}
+            disabled={pushingLeadId === lead.id}
+            className="p-2 rounded-lg transition-colors text-sm px-3
+                       bg-blue-100 text-blue-700 hover:bg-blue-200"
+            title="Push Lead"
+          >
+            {pushingLeadId === lead.id ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              "Push"
+            )}
+          </button>
+
+          {/* Junk */}
+          <button
+            onClick={() => handleMarkAsJunk(lead.id)}
+            className="p-2 rounded-lg transition-colors text-sm px-3
+                       bg-gray-100 text-gray-600 hover:bg-gray-200"
+            title="Mark as Junk"
+          >
+            Junk
+          </button>
+        </>
+      )}
+
+    {/* DUPLICATE (only when pushed) */}
+    {lead.status === "pushed" && (
+      <button
+        onClick={() => handleMarkAsDuplicate(lead.id)}
+        disabled={markingDuplicateId === lead.id}
+        className="p-2 rounded-lg transition-colors flex items-center gap-1
+                   text-sm px-3 bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+        title="Mark as Duplicate"
+      >
+        {markingDuplicateId === lead.id ? (
+          <RefreshCw className="h-4 w-4 animate-spin" />
+        ) : (
+          <>
+            <Copy className="h-4 w-4" />
+            Duplicate
+          </>
+        )}
+      </button>
+    )}
+
+  </div>
+</td>
+
                         </motion.tr>
                       ))}
                     </AnimatePresence>

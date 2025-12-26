@@ -658,7 +658,7 @@ if (statusFilter !== "all") {
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <div>
-                                <div className="font-medium">{lead.phone || lead.phoneNumber}</div>
+                                <div className="font-medium">{ lead.phoneNumber}</div>
                                 <div className="text-sm text-gray-500">{lead.countryCode}</div>
                               </div>
                             </div>
