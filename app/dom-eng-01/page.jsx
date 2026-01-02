@@ -604,9 +604,9 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Phone
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Email
-                      </th>
+                      </th> */}
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Age
                       </th>
@@ -644,7 +644,7 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                           <td className="px-6 py-4">
                             <div className="font-medium">{lead.phone || "N/A"}</div>
                           </td>
-                          <td className="px-6 py-4">
+                          {/* <td className="px-6 py-4">
                             <a
                               href={`mailto:${lead.email}`}
                               className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-2"
@@ -652,7 +652,7 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                               <Mail className="h-4 w-4" />
                               {lead.email || "N/A"}
                             </a>
-                          </td>
+                          </td> */}
                           <td className="px-6 py-4">
                             <div className="font-medium">{lead.age || "N/A"}</div>
                           </td>

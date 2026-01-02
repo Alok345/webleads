@@ -644,7 +644,7 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="font-medium text-gray-900">{lead.name || lead.firstName || "N/A"}</div>
-                            <div className="text-sm text-gray-500">ID: {lead.id.substring(0, 8)}...</div>
+                            <div className="text-sm text-gray-500">ID: {lead.phone.substring(0, 8)}...</div>
                           </td>
                           <td className="px-6 py-4">
                             <div className="font-medium">{lead.phone || "N/A"}</div>

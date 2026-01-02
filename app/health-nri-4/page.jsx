@@ -93,7 +93,7 @@ export default function NRI1502() {
 
   // Fetch leads from Firestore
   useEffect(() => {
-    const q = query(collection(db, "health-nri-2"), orderBy("submittedAt", "desc"));
+    const q = query(collection(db, "health-nri-4"), orderBy("submittedAt", "desc"));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const leadsData = [];
@@ -185,7 +185,7 @@ export default function NRI1502() {
   const handlePushLead = async (leadId) => {
     try {
       setPushingLeadId(leadId);
-      const leadRef = doc(db, "health-nri-2", leadId);
+      const leadRef = doc(db, "health-nri-4", leadId);
       
       // Check current status
       const leadDoc = await getDoc(leadRef);
@@ -214,7 +214,7 @@ export default function NRI1502() {
 
     try {
       setMarkingDuplicateId(leadId);
-      const leadRef = doc(db, "health-nri-2", leadId);
+      const leadRef = doc(db, "health-nri-4", leadId);
       
       const leadDoc = await getDoc(leadRef);
       const currentStatus = leadDoc.data()?.status;
@@ -242,7 +242,7 @@ export default function NRI1502() {
       Name: lead.name || "",
       Phone: lead.phone || "",
       Email: lead.email || "",
-      Age: lead.memberAges || "",
+      Age: lead.age || "",
       "Year of Birth": lead.year_of_birth || "",
       Income: lead.income || "",
       City: lead.city || "",
@@ -363,7 +363,7 @@ export default function NRI1502() {
       try {
         setJunkingLeadId(leadId);
     
-        await updateDoc(doc(db, "health-nri-2", leadId), {
+        await updateDoc(doc(db, "health-nri-4", leadId), {
           status: "junk",
           junkAt: serverTimestamp(),
         });
@@ -413,7 +413,7 @@ export default function NRI1502() {
             <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Health NRI 1502</h1>
+                  <h1 className="text-3xl font-bold text-gray-900">Health NRI 1504</h1>
                   <p className="text-gray-600 mt-2">
                     Total: <span className="font-semibold">{filteredLeads.length}</span> leads | 
                     Pushed: <span className="font-semibold text-blue-600">
@@ -686,7 +686,7 @@ export default function NRI1502() {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
-                              <div className="font-medium">{lead.memberAges || lead.age}</div>
+                              <div className="font-medium">{lead.age || lead.memberAges}</div>
                               <div className="text-sm text-gray-500">
                                 ({lead.year_of_birth})
                               </div>

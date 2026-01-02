@@ -27,7 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
   User,
-  Phone,
+  phoneNumber,
   Mail,
   Calendar,
   DollarSign,
@@ -93,7 +93,7 @@ export default function NRI1502() {
 
   // Fetch leads from Firestore
   useEffect(() => {
-    const q = query(collection(db, "health-nri-2"), orderBy("submittedAt", "desc"));
+    const q = query(collection(db, "health-dom-1"), orderBy("submittedAt", "desc"));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const leadsData = [];
@@ -118,7 +118,7 @@ export default function NRI1502() {
       result = result.filter(
         (lead) =>
           lead.name?.toLowerCase().includes(term) ||
-          lead.phone?.toLowerCase().includes(term) ||
+          lead.phoneNumber?.toLowerCase().includes(term) ||
           lead.email?.toLowerCase().includes(term) ||
           lead.id?.toLowerCase().includes(term)
       );
@@ -185,7 +185,7 @@ export default function NRI1502() {
   const handlePushLead = async (leadId) => {
     try {
       setPushingLeadId(leadId);
-      const leadRef = doc(db, "health-nri-2", leadId);
+      const leadRef = doc(db, "health-dom-1", leadId);
       
       // Check current status
       const leadDoc = await getDoc(leadRef);
@@ -214,7 +214,7 @@ export default function NRI1502() {
 
     try {
       setMarkingDuplicateId(leadId);
-      const leadRef = doc(db, "health-nri-2", leadId);
+      const leadRef = doc(db, "health-dom-1", leadId);
       
       const leadDoc = await getDoc(leadRef);
       const currentStatus = leadDoc.data()?.status;
@@ -240,7 +240,7 @@ export default function NRI1502() {
     const worksheetData = filteredLeads.map((lead) => ({
       ID: lead.id,
       Name: lead.name || "",
-      Phone: lead.phone || "",
+      phoneNumber: lead.phoneNumber || "",
       Email: lead.email || "",
       Age: lead.memberAges || "",
       "Year of Birth": lead.year_of_birth || "",
@@ -363,7 +363,7 @@ export default function NRI1502() {
       try {
         setJunkingLeadId(leadId);
     
-        await updateDoc(doc(db, "health-nri-2", leadId), {
+        await updateDoc(doc(db, "health-dom-1", leadId), {
           status: "junk",
           junkAt: serverTimestamp(),
         });
@@ -413,7 +413,7 @@ export default function NRI1502() {
             <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Health NRI 1502</h1>
+                  <h1 className="text-3xl font-bold text-gray-900">Health Domestic</h1>
                   <p className="text-gray-600 mt-2">
                     Total: <span className="font-semibold">{filteredLeads.length}</span> leads | 
                     Pushed: <span className="font-semibold text-blue-600">
@@ -464,7 +464,7 @@ export default function NRI1502() {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input
                       type="text"
-                      placeholder="Search by name, phone, email..."
+                      placeholder="Search by name, phoneNumber, email..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
@@ -596,11 +596,11 @@ export default function NRI1502() {
                       </th>
                       <th
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                        onClick={() => handleSort("phone")}
+                        onClick={() => handleSort("phoneNumber")}
                       >
                         <div className="flex items-center gap-1">
-                          Phone
-                          {sortConfig.key === "phone" && (
+                          phoneNumber
+                          {sortConfig.key === "phoneNumber" && (
                             <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
                           )}
                         </div>
@@ -670,7 +670,7 @@ export default function NRI1502() {
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <div>
-                                <div className="font-medium">{lead.phone}</div>
+                                <div className="font-medium">{lead.phoneNumber}</div>
                                 <div className="text-sm text-gray-500">{lead.countryCode}</div>
                               </div>
                             </div>
@@ -686,7 +686,7 @@ export default function NRI1502() {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
-                              <div className="font-medium">{lead.memberAges || lead.age}</div>
+                              <div className="font-medium">{lead.memberAges}</div>
                               <div className="text-sm text-gray-500">
                                 ({lead.year_of_birth})
                               </div>
@@ -909,15 +909,15 @@ export default function NRI1502() {
                     {/* Contact Info */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                        <Phone className="h-5 w-5" />
+                        <phoneNumber className="h-5 w-5" />
                         Contact Information
                       </h3>
                       <div className="space-y-3">
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Phone</label>
+                          <label className="text-sm font-medium text-gray-500">phoneNumber</label>
                           <p className="mt-1 text-gray-900 flex items-center gap-2">
                             <Globe className="h-4 w-4 text-gray-400" />
-                            {selectedLead.countryCode} {selectedLead.phone}
+                            {selectedLead.countryCode} {selectedLead.phoneNumber}
                           </p>
                         </div>
                         <div>
