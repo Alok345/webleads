@@ -265,6 +265,7 @@ export default function NRI1502() {
       Age: lead.age || "",
       "Year of Birth": lead.year_of_birth || "",
       Income: lead.income || "",
+      City: lead.city || "",
       "Country Code": lead.countryCode || "",
       Status: lead.status || "new",
       "Submitted At (IST)": lead.submittedAt ? 
