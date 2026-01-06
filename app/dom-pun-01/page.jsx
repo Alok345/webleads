@@ -617,6 +617,9 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                         City
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Pushed At
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Date (IST)
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -629,7 +632,10 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     <AnimatePresence>
-                      {currentItems.map((lead) => (
+                      {currentItems.map((lead) => {
+                        
+                        const actionDate = lead.pushedAt ? lead.pushedAt : lead.submittedAt;
+                        return (
                         <motion.tr
                           key={lead.id}
                           initial={{ opacity: 0, y: 10 }}
@@ -671,6 +677,21 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                           <td className="px-6 py-4">
                             <div className="font-medium">{lead.city || "N/A"}</div>
                           </td>
+                          <td className="px-6 py-4">
+                                                      <div className="flex items-center gap-2">
+                                                        <Globe className="h-4 w-4 text-gray-400" />
+                                                        <span className="text-sm">
+                            {actionDate
+                              ? formatISTDate(
+                                  actionDate.toDate
+                                    ? actionDate.toDate()
+                                    : actionDate
+                                )
+                              : "N/A"}
+                          </span>
+                          
+                                                      </div>
+                                                    </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-gray-400" />
@@ -749,7 +770,7 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
 </td>
 
                         </motion.tr>
-                      ))}
+                      )})}
                     </AnimatePresence>
                   </tbody>
                 </table>

@@ -760,6 +760,9 @@ const [junkingLeadId, setJunkingLeadId] = useState(null);
                           )}
                         </div>
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Pushed At (IST)
+                      </th>
                       <th
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                         onClick={() => handleSort("submittedAt")}
@@ -830,6 +833,19 @@ const [junkingLeadId, setJunkingLeadId] = useState(null);
                             <div className="flex items-center gap-2">
                               <DollarSign className="h-4 w-4 text-green-600" />
                               <span className="font-medium">{lead.income || "N/A"}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-gray-400" />
+                              <span className="text-sm">
+  {lead.pushedAt || lead.junkAt || lead.duplicateMarkedAt
+    ? formatTableDate(
+        lead.pushedAt || lead.junkAt || lead.duplicateMarkedAt
+      )
+    : "N/A"}
+</span>
+
                             </div>
                           </td>
                           <td className="px-6 py-4">

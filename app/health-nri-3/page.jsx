@@ -632,6 +632,11 @@ export default function NRI1502() {
                       </th>
                       <th
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        >
+                          Pushed At
+                        </th>
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                         onClick={() => handleSort("submittedAt")}
                       >
                         <div className="flex items-center gap-1">
@@ -695,6 +700,30 @@ export default function NRI1502() {
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <span className="font-medium">{lead.city}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              {lead.pushedAt ? (
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 text-gray-400" />
+                                  <span className="text-sm">
+                                    {lead.pushedAt ||
+                                    lead.junkAt ||
+                                    lead.duplicateMarkedAt
+                                      ? formatTableDate(
+                                          lead.pushedAt ||
+                                            lead.junkAt ||
+                                            lead.duplicateMarkedAt
+                                        )
+                                      : "N/A"}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-sm text-gray-500">
+                                  Not Pushed
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="px-6 py-4">

@@ -59,7 +59,9 @@ export default function NRI1502() {
     key: "timestamp",
     direction: "desc",
   });
-  const [calendarDate, setCalendarDate] = useState("");
+ const [fromDate, setFromDate] = useState("");
+const [toDate, setToDate] = useState("");
+
 
   // Function to convert UTC to IST
   const convertUTCtoIST = (date) => {
@@ -143,18 +145,32 @@ export default function NRI1502() {
     }
 
     // Apply date filter using IST
-    if (calendarDate) {
-      const selectedISTDate = new Date(calendarDate + 'T00:00:00Z'); // Treat as UTC date
-      
-      result = result.filter((lead) => {
-        if (!lead.submittedAt) return false;
-        
-        const leadDate = lead.submittedAt?.toDate();
-        if (!leadDate) return false;
-        
-        return isSameISTDate(leadDate, selectedISTDate);
-      });
+    if (fromDate || toDate) {
+  const from = fromDate ? new Date(fromDate + "T00:00:00Z") : null;
+  const to = toDate ? new Date(toDate + "T23:59:59Z") : null;
+
+  result = result.filter((lead) => {
+    if (!lead.submittedAt) return false;
+
+    const leadDate = lead.submittedAt.toDate();
+    const istLeadDate = convertUTCtoIST(leadDate);
+
+    if (from && to) {
+      return istLeadDate >= from && istLeadDate <= to;
     }
+
+    if (from) {
+      return isSameISTDate(istLeadDate, from);
+    }
+
+    if (to) {
+      return isSameISTDate(istLeadDate, to);
+    }
+
+    return true;
+  });
+}
+
 
     // Apply sorting
     result = [...result].sort((a, b) => {
@@ -192,7 +208,7 @@ export default function NRI1502() {
     console.log("Filtered leads:", result.length);
     setFilteredLeads(result);
     setCurrentPage(1);
-  }, [leads, searchTerm, statusFilter, calendarDate, sortConfig]);
+  }, [leads, searchTerm, statusFilter, fromDate, toDate, sortConfig]);
 
   // Handle sort
   const handleSort = (key) => {
@@ -311,7 +327,8 @@ export default function NRI1502() {
   const handleResetFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
-    setCalendarDate("");
+    setFromDate("");
+    setToDate("");
     setSortConfig({ key: "timestamp", direction: "desc" });
   };
 
@@ -443,11 +460,11 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                     | Junk: <span className="font-semibold text-pink-600">
                       {leads.filter((l) => l.status === "junk").length}
                     </span>
-                    {calendarDate && (
+                    {/* {calendarDate && (
                       <span className="ml-4 text-blue-600">
                         | Showing: {formatISTDate(new Date(calendarDate + 'T00:00:00Z'))}
                       </span>
-                    )}
+                    )} */}
                   </p>
                 </div>
 
@@ -505,30 +522,34 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Calendar Filter (IST)
-                  </label>
-                  <div className="relative">
-                    <CalendarDays className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="date"
-                      value={calendarDate}
-                      onChange={(e) => setCalendarDate(e.target.value)}
-                      max={getTodayIST()}
-                      className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                    />
-                    {calendarDate && (
-                      <button
-                        onClick={() => setCalendarDate("")}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">
+    From Date (IST)
+  </label>
+  <input
+    type="date"
+    value={fromDate}
+    onChange={(e) => setFromDate(e.target.value)}
+    max={getTodayIST()}
+    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg"
+  />
+</div>
 
-                <div>
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">
+    To Date (IST)
+  </label>
+  <input
+    type="date"
+    value={toDate}
+    onChange={(e) => setToDate(e.target.value)}
+    max={getTodayIST()}
+    min={fromDate || undefined}
+    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg"
+  />
+</div>
+
+
+                {/* <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Sort By
                   </label>
@@ -542,11 +563,11 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                     <option value="age">Age</option>
                     <option value="income">Income</option>
                   </select>
-                </div>
+                </div> */}
               </div>
 
               {/* Quick Date Filters */}
-              <div className="flex flex-wrap gap-2">
+              {/* <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setCalendarDate(getTodayIST())}
                   className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
@@ -589,7 +610,7 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                 >
                   All Dates
                 </button>
-              </div>
+              </div> */}
             </div>
 
             {/* Leads Table */}
@@ -617,6 +638,9 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                         City
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Pushed At
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Date (IST)
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -629,7 +653,9 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     <AnimatePresence>
-                      {currentItems.map((lead) => (
+                      {currentItems.map((lead) => {
+                        const actionDate = lead.pushedAt || lead.junkAt || lead.duplicateMarkedAt;
+                        return (
                         <motion.tr
                           key={lead.id}
                           initial={{ opacity: 0, y: 10 }}
@@ -671,6 +697,21 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
                           <td className="px-6 py-4">
                             <div className="font-medium">{lead.city || "N/A"}</div>
                           </td>
+                          <td className="px-6 py-4">
+                                                      <div className="flex items-center gap-2">
+                                                        <Globe className="h-4 w-4 text-gray-400" />
+                                                        <span className="text-sm">
+                            {actionDate
+                              ? formatISTDate(
+                                  actionDate.toDate
+                                    ? actionDate.toDate()
+                                    : actionDate
+                                )
+                              : "N/A"}
+                          </span>
+                          
+                                                      </div>
+                                                    </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-gray-400" />
@@ -749,7 +790,7 @@ const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
 </td>
 
                         </motion.tr>
-                      ))}
+                      )})}
                     </AnimatePresence>
                   </tbody>
                 </table>

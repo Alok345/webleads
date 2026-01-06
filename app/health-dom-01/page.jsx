@@ -630,6 +630,9 @@ export default function NRI1502() {
                           )}
                         </div>
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Pushed At
+                      </th>
                       <th
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                         onClick={() => handleSort("submittedAt")}
@@ -697,6 +700,27 @@ export default function NRI1502() {
                               <span className="font-medium">{lead.city}</span>
                             </div>
                           </td>
+                          <td className="px-6 py-4">
+  <div className="flex items-center gap-2">
+    {lead.pushedAt || lead.junkAt || lead.duplicateMarkedAt ? (
+      <div className="flex items-center gap-2">
+        <Calendar className="h-4 w-4 text-gray-400" />
+        <span className="text-sm">
+          {formatTableDate(
+            lead.pushedAt ||
+            lead.junkAt ||
+            lead.duplicateMarkedAt
+          )}
+        </span>
+      </div>
+    ) : (
+      <span className="text-sm text-gray-500">
+        Not Available
+      </span>
+    )}
+  </div>
+</td>
+
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-gray-400" />
