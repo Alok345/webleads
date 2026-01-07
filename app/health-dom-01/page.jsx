@@ -48,7 +48,8 @@ export default function NRI1502() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [calendarDate, setCalendarDate] = useState("");
+ const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [selectedLead, setSelectedLead] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [pushingLeadId, setPushingLeadId] = useState(null);
@@ -130,14 +131,26 @@ export default function NRI1502() {
     }
 
     // Apply date filter using IST
-    if (calendarDate) {
-      const selectedISTDate = new Date(calendarDate + 'T00:00:00Z');
-      
+     if (startDate || endDate) {
       result = result.filter((lead) => {
         const leadDate = lead.submittedAt?.toDate();
         if (!leadDate) return false;
-        
-        return isSameISTDate(leadDate, selectedISTDate);
+
+        const istLeadDate = convertUTCtoIST(leadDate);
+
+        if (startDate && endDate) {
+          const start = new Date(startDate + "T00:00:00Z");
+          const end = new Date(endDate + "T23:59:59Z");
+          return istLeadDate >= start && istLeadDate <= end;
+        } else if (startDate) {
+          const start = new Date(startDate + "T00:00:00Z");
+          return isSameISTDate(istLeadDate, start);
+        } else if (endDate) {
+          const end = new Date(endDate + "T00:00:00Z");
+          return isSameISTDate(istLeadDate, end);
+        }
+
+        return true;
       });
     }
 
@@ -171,7 +184,7 @@ export default function NRI1502() {
 
     setFilteredLeads(result);
     setCurrentPage(1);
-  }, [leads, searchTerm, statusFilter, calendarDate, sortConfig]);
+  }, [leads, searchTerm, statusFilter, startDate, endDate, sortConfig]);
 
   // Handle sort
   const handleSort = (key) => {
@@ -428,11 +441,11 @@ export default function NRI1502() {
                     | Junk: <span className="font-semibold text-pink-600">
                       {leads.filter((l) => l.status === "junk").length}
                     </span>
-                    {calendarDate && (
+                    {/* {calendarDate && (
                       <span className="ml-4 text-blue-600">
                         | Showing: {formatISTDate(new Date(calendarDate + 'T00:00:00Z'))}
                       </span>
-                    )}
+                    )} */}
                   </p>
                 </div>
 
@@ -489,91 +502,46 @@ export default function NRI1502() {
                   </select>
                 </div>
 
-                <div>
+                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Calendar Filter (IST)
+                    Date Range Filter (IST)
                   </label>
-                  <div className="relative">
-                    <CalendarDays className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="date"
-                      value={calendarDate}
-                      onChange={(e) => setCalendarDate(e.target.value)}
-                      max={getTodayIST()}
-                      className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                    />
-                    {calendarDate && (
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <CalendarDays className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        max={getTodayIST()}
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                      />
+                    </div>
+                    <div className="relative flex-1">
+                      <CalendarDays className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        max={getTodayIST()}
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                      />
+                    </div>
+                    {(startDate || endDate) && (
                       <button
-                        onClick={() => setCalendarDate("")}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        onClick={() => {
+                          setStartDate("");
+                          setEndDate("");
+                        }}
+                        className="px-3 py-2 text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg"
                       >
-                        <X className="h-4 w-4" />
+                        Clear
                       </button>
                     )}
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Sort By
-                  </label>
-                  <select
-                    value={sortConfig.key}
-                    onChange={(e) => handleSort(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                  >
-                    <option value="submittedAt">Date (Newest)</option>
-                    <option value="name">Name</option>
-                    <option value="age">Age</option>
-                    <option value="city">City</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Quick Date Filters */}
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setCalendarDate(getTodayIST())}
-                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                    calendarDate === getTodayIST()
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  Today
-                </button>
-                <button
-                  onClick={() => {
-                    const today = new Date();
-                    const yesterday = new Date(today);
-                    yesterday.setDate(yesterday.getDate() - 1);
-                    const istYesterday = new Date(yesterday.getTime() );
-                    setCalendarDate(istYesterday.toISOString().split('T')[0]);
-                  }}
-                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                    calendarDate === (() => {
-                      const today = new Date();
-                      const yesterday = new Date(today);
-                      yesterday.setDate(yesterday.getDate() - 1);
-                      const istYesterday = new Date(yesterday.getTime() );
-                      return istYesterday.toISOString().split('T')[0];
-                    })()
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  Yesterday
-                </button>
-                <button
-                  onClick={() => setCalendarDate("")}
-                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                    !calendarDate
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  All Dates
-                </button>
+                
               </div>
             </div>
 

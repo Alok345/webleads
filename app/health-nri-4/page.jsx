@@ -442,11 +442,11 @@ const [endDate, setEndDate] = useState("");
                     | Junk: <span className="font-semibold text-pink-600">
                       {leads.filter((l) => l.status === "junk").length}
                     </span>
-                    {calendarDate && (
+                    {/* {calendarDate && (
                       <span className="ml-4 text-blue-600">
                         | Showing: {formatISTDate(new Date(calendarDate + 'T00:00:00Z'))}
                       </span>
-                    )}
+                    )} */}
                   </p>
                 </div>
 
