@@ -889,13 +889,7 @@ export default function NRI1502() {
                     <h3 className="text-lg font-medium text-gray-900 mb-2">
                       No leads found
                     </h3>
-                    <p className="text-gray-500">
-                      {calendarDate
-                        ? `No leads submitted on ${formatISTDate(
-                            new Date(calendarDate + "T00:00:00Z")
-                          )}. Try another date or remove the date filter.`
-                        : "Try adjusting your search or filter to find what you're looking for."}
-                    </p>
+                    
                   </div>
                 )}
               </div>

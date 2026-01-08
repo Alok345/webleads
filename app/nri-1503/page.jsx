@@ -37,10 +37,21 @@ import {
   Copy,
   AlertCircle,
 } from "lucide-react";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 export default function NRI1502() {
   const [leads, setLeads] = useState([]);
@@ -48,7 +59,9 @@ export default function NRI1502() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [calendarDate, setCalendarDate] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  
   const [selectedLead, setSelectedLead] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [pushingLeadId, setPushingLeadId] = useState(null);
@@ -65,25 +78,25 @@ export default function NRI1502() {
     if (!date) return null;
     const utcDate = new Date(date);
     // IST is UTC+5:30
-    return new Date(utcDate.getTime() );
+    return new Date(utcDate.getTime());
   };
 
   // Function to get IST date string (YYYY-MM-DD format)
   const getISTDateString = (date) => {
     const istDate = convertUTCtoIST(date);
     if (!istDate) return "";
-    return istDate.toISOString().split('T')[0];
+    return istDate.toISOString().split("T")[0];
   };
 
   // Function to check if two dates are same in IST
   const isSameISTDate = (date1, date2) => {
     if (!date1 || !date2) return false;
-    
+
     const istDate1 = convertUTCtoIST(date1);
     const istDate2 = convertUTCtoIST(date2);
-    
+
     if (!istDate1 || !istDate2) return false;
-    
+
     return (
       istDate1.getFullYear() === istDate2.getFullYear() &&
       istDate1.getMonth() === istDate2.getMonth() &&
@@ -94,7 +107,7 @@ export default function NRI1502() {
   // Fetch leads from Firestore
   useEffect(() => {
     const q = query(collection(db, "nri-1503"), orderBy("submittedAt", "desc"));
-    
+
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const leadsData = [];
       querySnapshot.forEach((doc) => {
@@ -130,16 +143,29 @@ export default function NRI1502() {
     }
 
     // Apply date filter using IST
-    if (calendarDate) {
-      const selectedISTDate = new Date(calendarDate + 'T00:00:00Z');
-      
-      result = result.filter((lead) => {
-        const leadDate = lead.submittedAt?.toDate();
-        if (!leadDate) return false;
-        
-        return isSameISTDate(leadDate, selectedISTDate);
-      });
+     if (startDate || endDate) {
+  result = result.filter((lead) => {
+    const leadDate = lead.submittedAt?.toDate();
+    if (!leadDate) return false;
+
+    const istLeadDate = convertUTCtoIST(leadDate);
+
+    if (startDate && endDate) {
+      const start = new Date(startDate + "T00:00:00Z");
+      const end = new Date(endDate + "T23:59:59Z");
+      return istLeadDate >= start && istLeadDate <= end;
+    } else if (startDate) {
+      const start = new Date(startDate + "T00:00:00Z");
+      return isSameISTDate(istLeadDate, start);
+    } else if (endDate) {
+      const end = new Date(endDate + "T00:00:00Z");
+      return isSameISTDate(istLeadDate, end);
     }
+
+    return true;
+  });
+}
+
 
     // Apply sorting
     result = [...result].sort((a, b) => {
@@ -151,7 +177,7 @@ export default function NRI1502() {
       if (sortConfig.key === "submittedAt" || sortConfig.key === "pushedAt") {
         const aDate = aValue.toDate();
         const bDate = bValue.toDate();
-        return sortConfig.direction === "asc" 
+        return sortConfig.direction === "asc"
           ? aDate.getTime() - bDate.getTime()
           : bDate.getTime() - aDate.getTime();
       }
@@ -163,7 +189,9 @@ export default function NRI1502() {
       }
 
       if (typeof aValue === "number" && typeof bValue === "number") {
-        return sortConfig.direction === "asc" ? aValue - bValue : bValue - aValue;
+        return sortConfig.direction === "asc"
+          ? aValue - bValue
+          : bValue - aValue;
       }
 
       return 0;
@@ -171,7 +199,7 @@ export default function NRI1502() {
 
     setFilteredLeads(result);
     setCurrentPage(1);
-  }, [leads, searchTerm, statusFilter, calendarDate, sortConfig]);
+  }, [leads, searchTerm, statusFilter, startDate, endDate, sortConfig]);
 
   // Handle sort
   const handleSort = (key) => {
@@ -186,11 +214,11 @@ export default function NRI1502() {
     try {
       setPushingLeadId(leadId);
       const leadRef = doc(db, "nri-1503", leadId);
-      
+
       // Check current status
       const leadDoc = await getDoc(leadRef);
       const currentStatus = leadDoc.data()?.status;
-      
+
       // Only update if not already pushed
       if (currentStatus !== "pushed") {
         await updateDoc(leadRef, {
@@ -208,17 +236,19 @@ export default function NRI1502() {
 
   // Mark as duplicate
   const handleMarkAsDuplicate = async (leadId) => {
-    if (!window.confirm("Are you sure you want to mark this lead as duplicate?")) {
+    if (
+      !window.confirm("Are you sure you want to mark this lead as duplicate?")
+    ) {
       return;
     }
 
     try {
       setMarkingDuplicateId(leadId);
       const leadRef = doc(db, "nri-1503", leadId);
-      
+
       const leadDoc = await getDoc(leadRef);
       const currentStatus = leadDoc.data()?.status;
-      
+
       if (currentStatus !== "duplicate") {
         await updateDoc(leadRef, {
           status: "duplicate",
@@ -248,24 +278,30 @@ export default function NRI1502() {
       "Country Code": lead.countryCode || "",
       Campaign: lead.campaign || "",
       Status: lead.status || "new",
-      "Submitted At (IST)": lead.submittedAt ? 
-        convertUTCtoIST(lead.submittedAt.toDate()).toLocaleString('en-IN', {
-          timeZone: 'Asia/Kolkata',
-          dateStyle: 'medium',
-          timeStyle: 'medium'
-        }) : "",
-      "Pushed At (IST)": lead.pushedAt ? 
-        convertUTCtoIST(lead.pushedAt.toDate()).toLocaleString('en-IN', {
-          timeZone: 'Asia/Kolkata',
-          dateStyle: 'medium',
-          timeStyle: 'medium'
-        }) : "",
-      "Duplicate Marked At (IST)": lead.duplicateMarkedAt ? 
-        convertUTCtoIST(lead.duplicateMarkedAt.toDate()).toLocaleString('en-IN', {
-          timeZone: 'Asia/Kolkata',
-          dateStyle: 'medium',
-          timeStyle: 'medium'
-        }) : "",
+      "Submitted At (IST)": lead.submittedAt
+        ? convertUTCtoIST(lead.submittedAt.toDate()).toLocaleString("en-IN", {
+            timeZone: "Asia/Kolkata",
+            dateStyle: "medium",
+            timeStyle: "medium",
+          })
+        : "",
+      "Pushed At (IST)": lead.pushedAt
+        ? convertUTCtoIST(lead.pushedAt.toDate()).toLocaleString("en-IN", {
+            timeZone: "Asia/Kolkata",
+            dateStyle: "medium",
+            timeStyle: "medium",
+          })
+        : "",
+      "Duplicate Marked At (IST)": lead.duplicateMarkedAt
+        ? convertUTCtoIST(lead.duplicateMarkedAt.toDate()).toLocaleString(
+            "en-IN",
+            {
+              timeZone: "Asia/Kolkata",
+              dateStyle: "medium",
+              timeStyle: "medium",
+            }
+          )
+        : "",
       "Duplicate Marked By": lead.duplicateMarkedBy || "",
       "IP Address": lead.ipAddress || "",
       Language: lead.language || "",
@@ -278,7 +314,10 @@ export default function NRI1502() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Leads");
 
     // Auto-size columns
-    const maxWidth = worksheetData.reduce((w, r) => Math.max(w, r.Name.length), 10);
+    const maxWidth = worksheetData.reduce(
+      (w, r) => Math.max(w, r.Name.length),
+      10
+    );
     worksheet["!cols"] = [{ wch: maxWidth + 2 }];
 
     const excelBuffer = XLSX.write(workbook, {
@@ -287,7 +326,9 @@ export default function NRI1502() {
     });
     const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
 
-    const filename = `NRI-1503-Leads-${new Date().toISOString().split("T")[0]}.xlsx`;
+    const filename = `NRI-1503-Leads-${
+      new Date().toISOString().split("T")[0]
+    }.xlsx`;
     saveAs(blob, filename);
   };
 
@@ -301,27 +342,28 @@ export default function NRI1502() {
   const handleResetFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
-    setCalendarDate("");
+    setStartDate("");
+    setEndDate("");
     setSortConfig({ key: "submittedAt", direction: "desc" });
   };
 
   // Get current date in IST for date picker max
   const getTodayIST = () => {
     const now = new Date();
-    const istDate = new Date(now.getTime() );
-    return istDate.toISOString().split('T')[0];
+    const istDate = new Date(now.getTime());
+    return istDate.toISOString().split("T")[0];
   };
 
   // Format date for display in IST
   const formatISTDate = (date) => {
     if (!date) return "";
     const istDate = convertUTCtoIST(date);
-    return istDate.toLocaleDateString('en-IN', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'Asia/Kolkata'
+    return istDate.toLocaleDateString("en-IN", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      timeZone: "Asia/Kolkata",
     });
   };
 
@@ -330,11 +372,11 @@ export default function NRI1502() {
     if (!timestamp) return "N/A";
     const date = timestamp.toDate();
     const istDate = convertUTCtoIST(date);
-    return istDate.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'Asia/Kolkata'
+    return istDate.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "Asia/Kolkata",
     });
   };
 
@@ -360,21 +402,18 @@ export default function NRI1502() {
     }
   };
 
+  const handleMarkAsJunk = async (leadId) => {
+    try {
+      if (!leadId) return;
 
-  
-const handleMarkAsJunk = async (leadId) => {
-  try {
-    if (!leadId) return;
-
-    await updateDoc(doc(db, "nri-1503", leadId), {
-      status: "junk",
-      junkAt: serverTimestamp(),
-    });
-
-  } catch (error) {
-    console.error("Error marking lead as junk:", error);
-  }
-};
+      await updateDoc(doc(db, "nri-1503", leadId), {
+        status: "junk",
+        junkAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error marking lead as junk:", error);
+    }
+  };
 
   if (loading) {
     return (
@@ -414,26 +453,39 @@ const handleMarkAsJunk = async (leadId) => {
             <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">NRI 1503 Leads</h1>
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    NRI 1503 Leads
+                  </h1>
                   <p className="text-gray-600 mt-2">
-                    Total: <span className="font-semibold">{filteredLeads.length}</span> leads | 
-                    Pushed: <span className="font-semibold text-blue-600">
+                    Total:{" "}
+                    <span className="font-semibold">
+                      {filteredLeads.length}
+                    </span>{" "}
+                    leads | Pushed:{" "}
+                    <span className="font-semibold text-blue-600">
                       {leads.filter((l) => l.status === "pushed").length}
-                    </span> | 
-                    New: <span className="font-semibold text-green-600">
-                      {leads.filter((l) => !l.status || l.status === "new").length}
-                    </span> |
-                    Duplicate: <span className="font-semibold text-orange-600">
+                    </span>{" "}
+                    | New:{" "}
+                    <span className="font-semibold text-green-600">
+                      {
+                        leads.filter((l) => !l.status || l.status === "new")
+                          .length
+                      }
+                    </span>{" "}
+                    | Duplicate:{" "}
+                    <span className="font-semibold text-orange-600">
                       {leads.filter((l) => l.status === "duplicate").length}
                     </span>
-                    | Junk: <span className="font-semibold text-pink-600">
+                    | Junk:{" "}
+                    <span className="font-semibold text-pink-600">
                       {leads.filter((l) => l.status === "junk").length}
                     </span>
-                    {calendarDate && (
+                    {/* {calendarDate && (
                       <span className="ml-4 text-blue-600">
-                        | Showing: {formatISTDate(new Date(calendarDate + 'T00:00:00Z'))}
+                        | Showing:{" "}
+                        {formatISTDate(new Date(calendarDate + "T00:00:00Z"))}
                       </span>
-                    )}
+                    )} */}
                   </p>
                 </div>
 
@@ -473,7 +525,7 @@ const handleMarkAsJunk = async (leadId) => {
                   </div>
                 </div>
 
-                 <div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Status
                   </label>
@@ -492,29 +544,44 @@ const handleMarkAsJunk = async (leadId) => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Calendar Filter (IST)
+                    Date Range Filter (IST)
                   </label>
-                  <div className="relative">
-                    <CalendarDays className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="date"
-                      value={calendarDate}
-                      onChange={(e) => setCalendarDate(e.target.value)}
-                      max={getTodayIST()}
-                      className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                    />
-                    {calendarDate && (
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <CalendarDays className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        max={getTodayIST()}
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                      />
+                    </div>
+                    <div className="relative flex-1">
+                      <CalendarDays className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        max={getTodayIST()}
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                      />
+                    </div>
+                    {(startDate || endDate) && (
                       <button
-                        onClick={() => setCalendarDate("")}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        onClick={() => {
+                          setStartDate("");
+                          setEndDate("");
+                        }}
+                        className="px-3 py-2 text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg"
                       >
-                        <X className="h-4 w-4" />
+                        Clear
                       </button>
                     )}
                   </div>
                 </div>
 
-                <div>
+                {/* <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Sort By
                   </label>
@@ -528,17 +595,17 @@ const handleMarkAsJunk = async (leadId) => {
                     <option value="age">Age</option>
                     <option value="income">Income</option>
                   </select>
-                </div>
+                </div> */}
               </div>
 
               {/* Quick Date Filters */}
-              <div className="flex flex-wrap gap-2">
+              {/* <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setCalendarDate(getTodayIST())}
                   className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                     calendarDate === getTodayIST()
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
                   Today
@@ -548,19 +615,20 @@ const handleMarkAsJunk = async (leadId) => {
                     const today = new Date();
                     const yesterday = new Date(today);
                     yesterday.setDate(yesterday.getDate() - 1);
-                    const istYesterday = new Date(yesterday.getTime() );
-                    setCalendarDate(istYesterday.toISOString().split('T')[0]);
+                    const istYesterday = new Date(yesterday.getTime());
+                    setCalendarDate(istYesterday.toISOString().split("T")[0]);
                   }}
                   className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                    calendarDate === (() => {
+                    calendarDate ===
+                    (() => {
                       const today = new Date();
                       const yesterday = new Date(today);
                       yesterday.setDate(yesterday.getDate() - 1);
-                      const istYesterday = new Date(yesterday.getTime() );
-                      return istYesterday.toISOString().split('T')[0];
+                      const istYesterday = new Date(yesterday.getTime());
+                      return istYesterday.toISOString().split("T")[0];
                     })()
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
                   Yesterday
@@ -569,13 +637,13 @@ const handleMarkAsJunk = async (leadId) => {
                   onClick={() => setCalendarDate("")}
                   className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                     !calendarDate
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
                   All Dates
                 </button>
-              </div>
+              </div> */}
             </div>
 
             {/* Leads Table */}
@@ -591,7 +659,9 @@ const handleMarkAsJunk = async (leadId) => {
                         <div className="flex items-center gap-1">
                           Name
                           {sortConfig.key === "name" && (
-                            <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
+                            <span>
+                              {sortConfig.direction === "asc" ? "↑" : "↓"}
+                            </span>
                           )}
                         </div>
                       </th>
@@ -602,7 +672,9 @@ const handleMarkAsJunk = async (leadId) => {
                         <div className="flex items-center gap-1">
                           Phone
                           {sortConfig.key === "phone" && (
-                            <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
+                            <span>
+                              {sortConfig.direction === "asc" ? "↑" : "↓"}
+                            </span>
                           )}
                         </div>
                       </th>
@@ -616,7 +688,9 @@ const handleMarkAsJunk = async (leadId) => {
                         <div className="flex items-center gap-1">
                           Age
                           {sortConfig.key === "age" && (
-                            <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
+                            <span>
+                              {sortConfig.direction === "asc" ? "↑" : "↓"}
+                            </span>
                           )}
                         </div>
                       </th>
@@ -627,7 +701,9 @@ const handleMarkAsJunk = async (leadId) => {
                         <div className="flex items-center gap-1">
                           Income
                           {sortConfig.key === "income" && (
-                            <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
+                            <span>
+                              {sortConfig.direction === "asc" ? "↑" : "↓"}
+                            </span>
                           )}
                         </div>
                       </th>
@@ -641,7 +717,9 @@ const handleMarkAsJunk = async (leadId) => {
                         <div className="flex items-center gap-1">
                           Date (IST)
                           {sortConfig.key === "submittedAt" && (
-                            <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
+                            <span>
+                              {sortConfig.direction === "asc" ? "↑" : "↓"}
+                            </span>
                           )}
                         </div>
                       </th>
@@ -666,16 +744,24 @@ const handleMarkAsJunk = async (leadId) => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div>
-                                <div className="font-medium text-gray-900">{lead.name}</div>
-                                <div className="text-sm text-gray-500">ID: {lead.id.substring(0, 8)}...</div>
+                                <div className="font-medium text-gray-900">
+                                  {lead.name}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  ID: {lead.id.substring(0, 8)}...
+                                </div>
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <div>
-                                <div className="font-medium">{lead.phone || lead.phoneNumber}</div>
-                                <div className="text-sm text-gray-500">{lead.countryCode}</div>
+                                <div className="font-medium">
+                                  {lead.phone || lead.phoneNumber}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {lead.countryCode}
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -703,18 +789,21 @@ const handleMarkAsJunk = async (leadId) => {
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                                                      <div className="flex items-center gap-2">
-                                                        <Clock className="h-4 w-4 text-gray-400" />
-                                                       <span className="text-sm">
-  {lead.pushedAt || lead.junkAt || lead.duplicateMarkedAt
-    ? formatTableDate(
-        lead.pushedAt || lead.junkAt || lead.duplicateMarkedAt
-      )
-    : "N/A"}
-</span>
-
-                                                      </div>
-                                                    </td>
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-gray-400" />
+                              <span className="text-sm">
+                                {lead.pushedAt ||
+                                lead.junkAt ||
+                                lead.duplicateMarkedAt
+                                  ? formatTableDate(
+                                      lead.pushedAt ||
+                                        lead.junkAt ||
+                                        lead.duplicateMarkedAt
+                                    )
+                                  : "N/A"}
+                              </span>
+                            </div>
+                          </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-gray-400" />
@@ -732,70 +821,67 @@ const handleMarkAsJunk = async (leadId) => {
                               {lead.status || "new"}
                             </span>
                           </td>
-                       <td className="px-6 py-4">
-  <div className="flex gap-2">
+                          <td className="px-6 py-4">
+                            <div className="flex gap-2">
+                              {/* View button always visible */}
+                              <button
+                                onClick={() => handleViewLead(lead)}
+                                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                title="View Details"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </button>
 
-    {/* View button always visible */}
-    <button
-      onClick={() => handleViewLead(lead)}
-      className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-      title="View Details"
-    >
-      <Eye className="h-4 w-4" />
-    </button>
+                              {/* PUSH + JUNK (only when NOT pushed / junk / duplicate) */}
+                              {lead.status !== "pushed" &&
+                                lead.status !== "junk" &&
+                                lead.status !== "duplicate" && (
+                                  <>
+                                    {/* Push */}
+                                    <button
+                                      onClick={() => handlePushLead(lead.id)}
+                                      disabled={pushingLeadId === lead.id}
+                                      className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+                                      title="Push Lead"
+                                    >
+                                      {pushingLeadId === lead.id ? (
+                                        <RefreshCw className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        "Push"
+                                      )}
+                                    </button>
 
-    {/* PUSH + JUNK (only when NOT pushed / junk / duplicate) */}
-    {lead.status !== "pushed" &&
-      lead.status !== "junk" &&
-      lead.status !== "duplicate" && (
-        <>
-          {/* Push */}
-          <button
-            onClick={() => handlePushLead(lead.id)}
-            disabled={pushingLeadId === lead.id}
-            className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
-            title="Push Lead"
-          >
-            {pushingLeadId === lead.id ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              "Push"
-            )}
-          </button>
+                                    {/* Junk */}
+                                    <button
+                                      onClick={() => handleMarkAsJunk(lead.id)}
+                                      className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                                      title="Mark as Junk"
+                                    >
+                                      Junk
+                                    </button>
+                                  </>
+                                )}
 
-          {/* Junk */}
-          <button
-            onClick={() => handleMarkAsJunk(lead.id)}
-            className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-            title="Mark as Junk"
-          >
-            Junk
-          </button>
-        </>
-      )}
-
-    {/* DUPLICATE (only when pushed) */}
-    {lead.status === "pushed" && (
-      <button
-        onClick={() => handleMarkAsDuplicate(lead.id)}
-        disabled={markingDuplicateId === lead.id}
-        className="p-2 rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors flex items-center gap-1"
-        title="Mark as Duplicate"
-      >
-        {markingDuplicateId === lead.id ? (
-          <RefreshCw className="h-4 w-4 animate-spin" />
-        ) : (
-          <>
-            <Copy className="h-4 w-4" />
-            Duplicate
-          </>
-        )}
-      </button>
-    )}
-
-  </div>
-</td>
-
+                              {/* DUPLICATE (only when pushed) */}
+                              {lead.status === "pushed" && (
+                                <button
+                                  onClick={() => handleMarkAsDuplicate(lead.id)}
+                                  disabled={markingDuplicateId === lead.id}
+                                  className="p-2 rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors flex items-center gap-1"
+                                  title="Mark as Duplicate"
+                                >
+                                  {markingDuplicateId === lead.id ? (
+                                    <RefreshCw className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Copy className="h-4 w-4" />
+                                      Duplicate
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </td>
                         </motion.tr>
                       ))}
                     </AnimatePresence>
@@ -807,10 +893,14 @@ const handleMarkAsJunk = async (leadId) => {
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
                       <Search className="h-8 w-8 text-gray-400" />
                     </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No leads found</h3>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      No leads found
+                    </h3>
                     <p className="text-gray-500">
-                      {calendarDate 
-                        ? `No leads submitted on ${formatISTDate(new Date(calendarDate + 'T00:00:00Z'))}. Try another date or remove the date filter.`
+                      {calendarDate
+                        ? `No leads submitted on ${formatISTDate(
+                            new Date(calendarDate + "T00:00:00Z")
+                          )}. Try another date or remove the date filter.`
                         : "Try adjusting your search or filter to find what you're looking for."}
                     </p>
                   </div>
@@ -822,53 +912,68 @@ const handleMarkAsJunk = async (leadId) => {
                 <div className="border-t border-gray-200 px-6 py-4">
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="text-sm text-gray-700">
-                      Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
+                      Showing{" "}
+                      <span className="font-medium">
+                        {indexOfFirstItem + 1}
+                      </span>{" "}
+                      to{" "}
                       <span className="font-medium">
                         {Math.min(indexOfLastItem, filteredLeads.length)}
                       </span>{" "}
-                      of <span className="font-medium">{filteredLeads.length}</span> results
+                      of{" "}
+                      <span className="font-medium">
+                        {filteredLeads.length}
+                      </span>{" "}
+                      results
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
                         disabled={currentPage === 1}
                         className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
                       >
                         <ChevronLeft className="h-4 w-4" />
                         Previous
                       </button>
-                      
-                      <div className="hidden sm:flex gap-1">
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                          let pageNum;
-                          if (totalPages <= 5) {
-                            pageNum = i + 1;
-                          } else if (currentPage <= 3) {
-                            pageNum = i + 1;
-                          } else if (currentPage >= totalPages - 2) {
-                            pageNum = totalPages - 4 + i;
-                          } else {
-                            pageNum = currentPage - 2 + i;
-                          }
 
-                          return (
-                            <button
-                              key={pageNum}
-                              onClick={() => setCurrentPage(pageNum)}
-                              className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                                currentPage === pageNum
-                                  ? "bg-blue-600 text-white"
-                                  : "text-gray-700 hover:bg-gray-100 border border-gray-300"
-                              }`}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        })}
+                      <div className="hidden sm:flex gap-1">
+                        {Array.from(
+                          { length: Math.min(5, totalPages) },
+                          (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) {
+                              pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1;
+                            } else if (currentPage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i;
+                            } else {
+                              pageNum = currentPage - 2 + i;
+                            }
+
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => setCurrentPage(pageNum)}
+                                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                  currentPage === pageNum
+                                    ? "bg-blue-600 text-white"
+                                    : "text-gray-700 hover:bg-gray-100 border border-gray-300"
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          }
+                        )}
                       </div>
 
                       <button
-                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(totalPages, p + 1))
+                        }
                         disabled={currentPage === totalPages}
                         className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
                       >
@@ -889,9 +994,12 @@ const handleMarkAsJunk = async (leadId) => {
                 <div className="p-6 border-b border-gray-200">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h2 className="text-2xl font-bold text-gray-900">Lead Details</h2>
+                      <h2 className="text-2xl font-bold text-gray-900">
+                        Lead Details
+                      </h2>
                       <p className="text-gray-600 mt-1">
-                        Submitted on {formatISTDate(selectedLead.submittedAt?.toDate())}
+                        Submitted on{" "}
+                        {formatISTDate(selectedLead.submittedAt?.toDate())}
                       </p>
                     </div>
                     <button
@@ -913,16 +1021,28 @@ const handleMarkAsJunk = async (leadId) => {
                       </h3>
                       <div className="space-y-3">
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Name</label>
-                          <p className="mt-1 text-gray-900">{selectedLead.name}</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            Name
+                          </label>
+                          <p className="mt-1 text-gray-900">
+                            {selectedLead.name}
+                          </p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Age</label>
-                          <p className="mt-1 text-gray-900">{selectedLead.age} years</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            Age
+                          </label>
+                          <p className="mt-1 text-gray-900">
+                            {selectedLead.age} years
+                          </p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Year of Birth</label>
-                          <p className="mt-1 text-gray-900">{selectedLead.year_of_birth}</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            Year of Birth
+                          </label>
+                          <p className="mt-1 text-gray-900">
+                            {selectedLead.year_of_birth}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -935,14 +1055,19 @@ const handleMarkAsJunk = async (leadId) => {
                       </h3>
                       <div className="space-y-3">
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Phone</label>
+                          <label className="text-sm font-medium text-gray-500">
+                            Phone
+                          </label>
                           <p className="mt-1 text-gray-900 flex items-center gap-2">
                             <Globe className="h-4 w-4 text-gray-400" />
-                            {selectedLead.countryCode} {selectedLead.phone || selectedLead.phoneNumber}
+                            {selectedLead.countryCode}{" "}
+                            {selectedLead.phone || selectedLead.phoneNumber}
                           </p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Email</label>
+                          <label className="text-sm font-medium text-gray-500">
+                            Email
+                          </label>
                           <a
                             href={`mailto:${selectedLead.email}`}
                             className="mt-1 text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-2"
@@ -962,15 +1087,25 @@ const handleMarkAsJunk = async (leadId) => {
                       </h3>
                       <div className="space-y-3">
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Income</label>
-                          <p className="mt-1 text-gray-900">{selectedLead.income}</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            Income
+                          </label>
+                          <p className="mt-1 text-gray-900">
+                            {selectedLead.income}
+                          </p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Campaign</label>
-                          <p className="mt-1 text-gray-900">{selectedLead.campaign || "N/A"}</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            Campaign
+                          </label>
+                          <p className="mt-1 text-gray-900">
+                            {selectedLead.campaign || "N/A"}
+                          </p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Status</label>
+                          <label className="text-sm font-medium text-gray-500">
+                            Status
+                          </label>
                           <div className="mt-1">
                             <span
                               className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
@@ -992,15 +1127,25 @@ const handleMarkAsJunk = async (leadId) => {
                       </h3>
                       <div className="space-y-3">
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Language</label>
-                          <p className="mt-1 text-gray-900">{selectedLead.language || "English"}</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            Language
+                          </label>
+                          <p className="mt-1 text-gray-900">
+                            {selectedLead.language || "English"}
+                          </p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-500">IP Address</label>
-                          <p className="mt-1 text-gray-900">{selectedLead.ipAddress || "N/A"}</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            IP Address
+                          </label>
+                          <p className="mt-1 text-gray-900">
+                            {selectedLead.ipAddress || "N/A"}
+                          </p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Source</label>
+                          <label className="text-sm font-medium text-gray-500">
+                            Source
+                          </label>
                           <p className="mt-1 text-gray-900 text-sm truncate">
                             {selectedLead.source || "N/A"}
                           </p>
@@ -1011,7 +1156,9 @@ const handleMarkAsJunk = async (leadId) => {
 
                   {selectedLead.notes && (
                     <div className="mt-6 pt-6 border-t border-gray-200">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3">Notes</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                        Notes
+                      </h3>
                       <div className="bg-gray-50 rounded-lg p-4">
                         <p className="text-gray-700">{selectedLead.notes}</p>
                       </div>
@@ -1026,8 +1173,12 @@ const handleMarkAsJunk = async (leadId) => {
                       </h3>
                       <div className="bg-orange-50 rounded-lg p-4">
                         <p className="text-orange-700">
-                          Marked as duplicate on {formatISTDate(selectedLead.duplicateMarkedAt?.toDate())}
-                          {selectedLead.duplicateMarkedBy && ` by ${selectedLead.duplicateMarkedBy}`}
+                          Marked as duplicate on{" "}
+                          {formatISTDate(
+                            selectedLead.duplicateMarkedAt?.toDate()
+                          )}
+                          {selectedLead.duplicateMarkedBy &&
+                            ` by ${selectedLead.duplicateMarkedBy}`}
                         </p>
                       </div>
                     </div>
@@ -1042,7 +1193,7 @@ const handleMarkAsJunk = async (leadId) => {
                     >
                       Close
                     </button>
-                    
+
                     {selectedLead.status === "pushed" ? (
                       <button
                         onClick={() => {
@@ -1057,7 +1208,9 @@ const handleMarkAsJunk = async (leadId) => {
                         }`}
                       >
                         <Copy className="h-4 w-4" />
-                        {selectedLead.status === "duplicate" ? "Already Duplicate" : "Mark as Duplicate"}
+                        {selectedLead.status === "duplicate"
+                          ? "Already Duplicate"
+                          : "Mark as Duplicate"}
                       </button>
                     ) : (
                       <button
@@ -1065,7 +1218,10 @@ const handleMarkAsJunk = async (leadId) => {
                           handlePushLead(selectedLead.id);
                           setIsDialogOpen(false);
                         }}
-                        disabled={selectedLead.status === "pushed" || selectedLead.status === "duplicate"}
+                        disabled={
+                          selectedLead.status === "pushed" ||
+                          selectedLead.status === "duplicate"
+                        }
                         className={`px-4 py-2.5 rounded-lg font-medium transition-colors ${
                           selectedLead.status === "pushed"
                             ? "bg-green-100 text-green-700 cursor-not-allowed"
@@ -1074,9 +1230,11 @@ const handleMarkAsJunk = async (leadId) => {
                             : "bg-blue-600 hover:bg-blue-700 text-white"
                         }`}
                       >
-                        {selectedLead.status === "pushed" ? "Already Pushed" : 
-                         selectedLead.status === "duplicate" ? "Cannot Push (Duplicate)" : 
-                         "Push Lead"}
+                        {selectedLead.status === "pushed"
+                          ? "Already Pushed"
+                          : selectedLead.status === "duplicate"
+                          ? "Cannot Push (Duplicate)"
+                          : "Push Lead"}
                       </button>
                     )}
                   </div>
